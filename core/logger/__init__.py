@@ -1,0 +1,133 @@
+from typing import Optional, Dict, Any
+from .logger import MultiProcessLogger, LoggerCore
+from .level import LogLevel
+from .handler import ConsoleHandler, RotatingFileHandler
+import atexit
+import os
+# 导入路径管理器
+from core.path import get_project_root, join_paths
+
+
+# 全局多进程logger管理器
+_logger_manager: Optional[MultiProcessLogger] = None
+
+
+def _get_logger_manager() -> MultiProcessLogger:
+    """获取全局logger管理器"""
+    global _logger_manager
+    if _logger_manager is None:
+        _logger_manager = MultiProcessLogger()
+    return _logger_manager
+
+
+def _get_current_logger() -> LoggerCore:
+    """获取当前进程的日志器"""
+    manager = _get_logger_manager()
+    # 这里可以根据实际的进程环境自动检测进程类型
+    # 为了简化，我们使用环境变量或默认为主进程
+    process_type = os.getenv('LOG_PROCESS_TYPE', 'main')
+    return manager.get_logger(process_type)
+
+
+def configure_logger(
+    level: LogLevel = LogLevel.DEBUG,
+    console: bool = True,
+    log_dir: Optional[str] = None,
+    process_type: Optional[str] = None
+) -> None:
+    """
+    配置logger
+    
+    Args:
+        level: 日志级别
+        console: 是否启用控制台输出
+        log_dir: 日志目录路径，如果为None则不启用文件输出
+        process_type: 进程类型 ("main", "renderer", "extension")，如果为None则配置所有进程类型
+    """
+    manager = _get_logger_manager()
+    
+    # 如果没有指定日志目录，使用项目根目录下的logs目录
+    if log_dir is None:
+        log_dir = join_paths(get_project_root(), 'logs')
+    
+    if process_type is None:
+        # 配置所有进程类型
+        manager.configure_all_loggers(
+            level=level,
+            console=console,
+            log_dir=log_dir
+        )
+    else:
+        # 配置特定进程类型
+        logger = manager.get_logger(process_type)
+        logger.set_level(level)
+        
+        # 清除现有处理器
+        logger.handlers.clear()
+        
+        # 添加控制台处理器
+        if console:
+            logger.add_handler(ConsoleHandler(level=level))
+        
+        # 添加文件处理器
+        if log_dir:
+            log_path = join_paths(log_dir, "app.log")
+            file_handler = RotatingFileHandler(
+                filename=log_path,
+                process_type=process_type,
+                level=level,
+                max_bytes=100 * 1024 * 1024,  # 100MB
+                backup_count=7,  # 保留7天
+                rotate_by_date=True
+            )
+            logger.add_handler(file_handler)
+
+
+def set_process_type(process_type: str) -> None:
+    """
+    设置当前进程类型
+    
+    Args:
+        process_type: 进程类型 ("main", "renderer", "extension")
+    """
+    os.environ['LOG_PROCESS_TYPE'] = process_type
+    manager = _get_logger_manager()
+    manager.set_default_process(process_type)
+
+
+# 暴露日志方法（自动根据当前进程类型选择日志器）
+def debug(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """调试级别日志"""
+    _get_current_logger().debug(message, extra)
+
+
+def info(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """信息级别日志"""
+    _get_current_logger().info(message, extra)
+
+
+def warning(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """警告级别日志"""
+    _get_current_logger().warning(message, extra)
+
+
+def error(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """错误级别日志"""
+    _get_current_logger().error(message, extra)
+
+
+def critical(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    """严重错误级别日志"""
+    _get_current_logger().critical(message, extra)
+
+
+# 设置默认配置 - 使用项目根目录下的logs目录
+configure_logger()
+
+# 注册退出清理
+def _cleanup():
+    """清理资源"""
+    global _logger_manager
+    _logger_manager = None
+
+atexit.register(_cleanup)
