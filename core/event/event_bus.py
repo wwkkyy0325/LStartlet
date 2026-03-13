@@ -48,7 +48,7 @@ class EventBus:
         try:
             from .events.ui_events import (
                 UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
-                UIMountAreaEvent, UIComponentLifecycleEvent
+                UIMountAreaEvent, UIComponentLifecycleEvent, RenderProcessReadyEvent
             )
             registry = self._type_registry
             registry.register_event_type(UIStyleUpdateEvent.EVENT_TYPE, UIStyleUpdateEvent, "ui")
@@ -56,6 +56,7 @@ class EventBus:
             registry.register_event_type(UIStateChangeEvent.EVENT_TYPE, UIStateChangeEvent, "ui")
             registry.register_event_type(UIMountAreaEvent.EVENT_TYPE, UIMountAreaEvent, "ui")
             registry.register_event_type(UIComponentLifecycleEvent.EVENT_TYPE, UIComponentLifecycleEvent, "ui")
+            registry.register_event_type(RenderProcessReadyEvent.EVENT_TYPE, RenderProcessReadyEvent, "ui")
         except ImportError:
             # 如果UI事件模块不存在，跳过注册（保持向后兼容）
             pass
@@ -67,7 +68,7 @@ class EventBus:
                 SchedulerStatusEvent, TaskSubmittedEvent, TaskStartedEvent,
                 TaskCompletedEvent, TaskFailedEvent, ProcessCreatedEvent,
                 ProcessStartedEvent, ProcessStoppedEvent, ProcessFailedEvent,
-                TickEvent
+                TickEvent, ConfigItemRegisteredEvent, ApplicationLifecycleEvent
             )
             registry = self._type_registry
             registry.register_event_type(SchedulerStatusEvent.EVENT_TYPE, SchedulerStatusEvent, "scheduler")
@@ -80,6 +81,8 @@ class EventBus:
             registry.register_event_type(ProcessStoppedEvent.EVENT_TYPE, ProcessStoppedEvent, "scheduler")
             registry.register_event_type(ProcessFailedEvent.EVENT_TYPE, ProcessFailedEvent, "scheduler")
             registry.register_event_type(TickEvent.EVENT_TYPE, TickEvent, "scheduler")
+            registry.register_event_type(ConfigItemRegisteredEvent.EVENT_TYPE, ConfigItemRegisteredEvent, "scheduler")
+            registry.register_event_type(ApplicationLifecycleEvent.EVENT_TYPE, ApplicationLifecycleEvent, "scheduler")
         except ImportError:
             # 如果调度事件模块不存在，跳过注册（保持向后兼容）
             pass
@@ -94,7 +97,7 @@ class EventBus:
                         SchedulerStatusEvent, TaskSubmittedEvent, TaskStartedEvent,
                         TaskCompletedEvent, TaskFailedEvent, ProcessCreatedEvent,
                         ProcessStartedEvent, ProcessStoppedEvent, ProcessFailedEvent,
-                        TickEvent
+                        TickEvent, ConfigItemRegisteredEvent
                     )
                     scheduler_event_map: Dict[str, Type[BaseEvent]] = {
                         SchedulerStatusEvent.EVENT_TYPE: SchedulerStatusEvent,
@@ -106,21 +109,27 @@ class EventBus:
                         ProcessStartedEvent.EVENT_TYPE: ProcessStartedEvent,
                         ProcessStoppedEvent.EVENT_TYPE: ProcessStoppedEvent,
                         ProcessFailedEvent.EVENT_TYPE: ProcessFailedEvent,
-                        TickEvent.EVENT_TYPE: TickEvent
+                        TickEvent.EVENT_TYPE: TickEvent,
+                        ConfigItemRegisteredEvent.EVENT_TYPE: ConfigItemRegisteredEvent
                     }
                     if event_type in scheduler_event_map:
                         self._type_registry.register_event_type(event_type, scheduler_event_map[event_type], "scheduler")
+                elif event_type == "scheduler.config.item.registered":
+                    # 单独处理配置项注册事件，使用字符串字面量避免未绑定错误
+                    from .events.scheduler_events import ConfigItemRegisteredEvent
+                    self._type_registry.register_event_type(ConfigItemRegisteredEvent.EVENT_TYPE, ConfigItemRegisteredEvent, "scheduler")
                 elif event_type.startswith("ui."):
                     from .events.ui_events import (
                         UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
-                        UIMountAreaEvent, UIComponentLifecycleEvent
+                        UIMountAreaEvent, UIComponentLifecycleEvent, RenderProcessReadyEvent
                     )
                     ui_event_map: Dict[str, Type[BaseEvent]] = {
                         UIStyleUpdateEvent.EVENT_TYPE: UIStyleUpdateEvent,
                         UIConfigChangeEvent.EVENT_TYPE: UIConfigChangeEvent,
                         UIStateChangeEvent.EVENT_TYPE: UIStateChangeEvent,
                         UIMountAreaEvent.EVENT_TYPE: UIMountAreaEvent,
-                        UIComponentLifecycleEvent.EVENT_TYPE: UIComponentLifecycleEvent
+                        UIComponentLifecycleEvent.EVENT_TYPE: UIComponentLifecycleEvent,
+                        RenderProcessReadyEvent.EVENT_TYPE: RenderProcessReadyEvent
                     }
                     if event_type in ui_event_map:
                         self._type_registry.register_event_type(event_type, ui_event_map[event_type], "ui")

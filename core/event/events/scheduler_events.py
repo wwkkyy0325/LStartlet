@@ -3,7 +3,7 @@
 定义调度器相关的各种事件类型
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Type, Callable
 from ..base_event import BaseEvent
 
 
@@ -30,6 +30,75 @@ class SchedulerStatusEvent(BaseEvent):
             "status": self.status,
             "details": self.details
         }
+
+
+class ApplicationLifecycleEvent(BaseEvent):
+    """应用程序生命周期事件 - 用于通知应用程序的启动、关闭等生命周期阶段"""
+    
+    EVENT_TYPE = "application.lifecycle"
+    
+    def __init__(self, lifecycle_stage: str, reason: Optional[str] = None):
+        """
+        初始化应用程序生命周期事件
+        
+        Args:
+            lifecycle_stage: 生命周期阶段 ('starting', 'started', 'stopping', 'stopped')
+            reason: 关闭原因（仅在stopping/stopped时使用）
+        """
+        super().__init__(self.EVENT_TYPE)
+        self.lifecycle_stage = lifecycle_stage
+        self.reason = reason
+    
+    def get_payload(self) -> Dict[str, Any]:
+        """获取事件载荷"""
+        return {
+            "lifecycle_stage": self.lifecycle_stage,
+            "reason": self.reason
+        }
+
+
+class ConfigItemRegisteredEvent(BaseEvent):
+    """配置项注册事件 - 在配置项读取前触发，允许外部模块注册自定义配置项"""
+    
+    EVENT_TYPE = "scheduler.config.item.registered"
+    
+    def __init__(self, config_manager: Any, plugin_name: Optional[str] = None):
+        """
+        初始化配置项注册事件
+        
+        Args:
+            config_manager: 配置管理器实例，用于注册配置项
+            plugin_name: 插件名称，用于标识配置项来源（可选）
+        """
+        super().__init__(self.EVENT_TYPE)
+        self.config_manager = config_manager
+        self.plugin_name = plugin_name
+    
+    def get_payload(self) -> Dict[str, Any]:
+        """获取事件载荷"""
+        return {
+            "config_manager": self.config_manager,
+            "plugin_name": self.plugin_name
+        }
+    
+    def register_config(self, key: str, default_value: Any, value_type: Type[Any], 
+                      description: str = "", validator: Optional[Callable[[Any], bool]] = None,
+                      plugin_name: Optional[str] = None) -> None:
+        """
+        便捷方法：通过事件直接注册配置项
+        
+        Args:
+            key: 配置项键名
+            default_value: 默认值
+            value_type: 值类型
+            description: 描述信息
+            validator: 自定义验证器函数
+            plugin_name: 插件名称（如果未提供，则使用事件中的plugin_name）
+        """
+        actual_plugin_name = plugin_name or self.plugin_name
+        self.config_manager.register_config_with_source(
+            key, default_value, value_type, description, validator, actual_plugin_name
+        )
 
 
 class TaskEvent(BaseEvent):

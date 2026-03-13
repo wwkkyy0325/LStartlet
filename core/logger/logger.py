@@ -37,6 +37,16 @@ class LoggerCore:
         """设置日志级别"""
         self.level = level
     
+    def close_handlers(self) -> None:
+        """关闭所有日志处理器"""
+        for handler in self.handlers[:]:  # 使用切片复制避免修改过程中迭代
+            try:
+                if hasattr(handler, 'close'):
+                    handler.close()
+                self.remove_handler(handler)
+            except Exception as e:
+                print(f"Error closing logger handler: {e}", file=sys.stderr)
+    
     def _log(self, level: LogLevel, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """记录日志的核心方法"""
         if level < self.level:
@@ -150,6 +160,7 @@ class MultiProcessLogger:
         
         for proc_type in process_types:
             logger = self.get_logger(proc_type)
+            # 设置日志级别
             logger.set_level(level)
             
             # 清除现有处理器

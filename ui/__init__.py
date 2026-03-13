@@ -1,4 +1,23 @@
 """
+UI模块入口
+"""
+
+from .ui_factory import UIFactory # type: ignore
+from .components.dialog import (
+    FileSelectDialog, # type: ignore
+    select_image_and_pdf_files, # type: ignore 
+    select_directory_for_ocr    # type: ignore
+)
+
+__all__ = [
+    'UIFactory',
+    # 弹窗组件
+    'FileSelectDialog',
+    'select_image_and_pdf_files', 
+    'select_directory_for_ocr'
+]
+
+"""
 OCR UI 模块公共API
 """
 

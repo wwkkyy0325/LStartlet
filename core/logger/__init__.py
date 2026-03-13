@@ -17,7 +17,45 @@ def _get_logger_manager() -> MultiProcessLogger:
     global _logger_manager
     if _logger_manager is None:
         _logger_manager = MultiProcessLogger()
+        # 注册应用程序生命周期事件监听器
+        _register_lifecycle_listeners()
     return _logger_manager
+
+
+def _register_lifecycle_listeners() -> None:
+    """注册应用程序生命周期事件监听器"""
+    try:
+        from core.event.event_bus import EventBus
+        from core.event.events.scheduler_events import ApplicationLifecycleEvent
+        
+        def _on_application_lifecycle_event(event: Any) -> bool:
+            """处理应用程序生命周期事件"""
+            try:
+                if hasattr(event, 'lifecycle_stage'):
+                    if event.lifecycle_stage in ("stopping", "stopped"):
+                        # 关闭所有日志处理器
+                        manager = _get_logger_manager()
+                        for logger_name in list(manager._loggers.keys()):
+                            logger = manager._loggers[logger_name]
+                            logger.close_handlers()
+                        info("日志管理器：所有日志处理器已关闭")
+                return True
+            except Exception as e:
+                print(f"Error in logger lifecycle handler: {e}", file=sys.stderr)
+                return False
+        
+        event_bus = EventBus()
+        event_bus.subscribe_lambda(
+            ApplicationLifecycleEvent.EVENT_TYPE,
+            _on_application_lifecycle_event,
+            "logger_lifecycle_handler"
+        )
+        
+    except ImportError:
+        # 如果事件系统不可用，跳过事件监听器注册
+        pass
+    except Exception as e:
+        print(f"Failed to register logger lifecycle listeners: {e}", file=sys.stderr)
 
 
 def _get_current_logger() -> LoggerCore:
