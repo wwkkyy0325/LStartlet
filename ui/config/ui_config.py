@@ -7,6 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List, Callable, Tuple, Union
 from enum import Enum
+# 使用项目自定义日志管理器
+from core.logger import error
 
 
 class BackgroundType(Enum):
@@ -100,16 +102,34 @@ class UIConfigManager:
     def __init__(self, config: Optional[UIConfig] = None):
         self._config = config or UIConfig()
         self._observers: List[Callable[[UIConfig], None]] = []
+        # 事件系统集成
+        self._ui_manager = None
     
     @property
     def config(self) -> UIConfig:
         """获取当前配置"""
         return self._config
     
+    def _get_ui_manager(self):
+        """获取UI组件管理器"""
+        if self._ui_manager is None:
+            from ui.components.ui_event_handler import UIComponentManager
+            self._ui_manager = UIComponentManager()
+        return self._ui_manager
+    
     def update_config(self, updates: Dict[str, Any]) -> None:
-        """更新配置并通知观察者"""
-        self._update_nested_config(self._config, updates)
-        self._notify_observers()
+        """更新配置并通知观察者和事件系统"""
+        try:
+            self._update_nested_config(self._config, updates)
+            self._notify_observers()
+            
+            # 发布配置变更事件到所有相关组件
+            ui_manager = self._get_ui_manager()
+            # 发布到通用配置变更事件（可以指定特定组件ID）
+            ui_manager.publish_config_change("global_config", updates)
+        except Exception as e:
+            error(f"更新UI配置失败: {e}", extra={"updates": updates})
+            raise
     
     def register_observer(self, observer: Callable[[UIConfig], None]) -> None:
         """注册配置变更观察者"""
@@ -134,7 +154,10 @@ class UIConfigManager:
     def _notify_observers(self) -> None:
         """通知所有观察者配置已变更"""
         for observer in self._observers:
-            observer(self._config)
+            try:
+                observer(self._config)
+            except Exception as e:
+                error(f"通知UI配置观察者失败: {e}", extra={"observer": str(observer)})
     
     def load_from_file(self, file_path: str) -> bool:
         """从文件加载配置"""
@@ -144,7 +167,8 @@ class UIConfigManager:
                 data = json.load(f)
             self.update_config(data)
             return True
-        except Exception:
+        except Exception as e:
+            error(f"从文件加载UI配置失败: {e}", extra={"file_path": file_path})
             return False
     
     def save_to_file(self, file_path: str) -> bool:
@@ -156,7 +180,8 @@ class UIConfigManager:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(config_dict, f, indent=2, ensure_ascii=False)
             return True
-        except Exception:
+        except Exception as e:
+            error(f"保存UI配置到文件失败: {e}", extra={"file_path": file_path})
             return False
     
     def _serialize_config(self, obj: Any) -> Union[Dict[str, Any], List[Any], Any]:

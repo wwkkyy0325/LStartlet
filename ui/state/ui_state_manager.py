@@ -15,6 +15,15 @@ class UIStateManager:
         self._current_state: UIState = UIState()
         self._observers: List[Callable[[UIState], None]] = []
         self._async_observers: List[Callable[[UIState], None]] = []
+        # 事件系统集成
+        self._ui_manager = None
+    
+    def _get_ui_manager(self):
+        """获取UI组件管理器"""
+        if self._ui_manager is None:
+            from ui.components.ui_event_handler import UIComponentManager
+            self._ui_manager = UIComponentManager()
+        return self._ui_manager
     
     def get_current_state(self) -> UIState:
         """获取当前状态"""
@@ -26,24 +35,36 @@ class UIStateManager:
                     progress: float = -1.0,
                     data: Optional[Dict[str, Any]] = None) -> None:
         """更新状态"""
+        state_changes: Dict[str, Any] = {}
+        
         # 更新状态字段
         if message:
             self._current_state.message = message
+            state_changes["message"] = message
         if state_type:
             self._current_state.state_type = state_type
+            state_changes["state_type"] = state_type
         if progress >= 0.0:
             self._current_state.progress = min(1.0, max(0.0, progress))
+            state_changes["progress"] = self._current_state.progress
         if data is not None:
             # 确保current_state.data不是None后再调用update
             if self._current_state.data is None:
                 self._current_state.data = {}
             self._current_state.data.update(data)
+            state_changes["data"] = data
         
         # 更新时间戳
         self._current_state.timestamp = time.time()
+        state_changes["timestamp"] = self._current_state.timestamp
         
         # 通知所有观察者
         self._notify_observers()
+        
+        # 发布状态变更事件到事件系统
+        if state_changes:
+            ui_manager = self._get_ui_manager()
+            ui_manager.publish_state_change("global_state", state_changes)
     
     def add_observer(self, observer: Callable[[UIState], None]) -> None:
         """添加同步观察者"""

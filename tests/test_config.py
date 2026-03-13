@@ -40,25 +40,25 @@ class TestConfigManager(unittest.TestCase):
         self.assertEqual(get_config("log_level"), "DEBUG")
         
         # 测试设置配置
-        success = set_config("log_level", "INFO")
+        success: bool = set_config("log_level", "INFO")
         self.assertTrue(success)
         self.assertEqual(get_config("log_level"), "INFO")
         
         # 测试重置配置
-        success = reset_config("log_level")
+        success: bool = reset_config("log_level")
         self.assertTrue(success)
         self.assertEqual(get_config("log_level"), "DEBUG")
     
     def test_register_new_config(self):
         """测试注册新配置"""
-        test_key = "test_custom_config"
+        test_key = "test_custom_config_12345"  # 使用唯一键名避免冲突
         test_value = "custom_value"
         
         # 确保配置不存在
         self.assertFalse(has_config(test_key))
         
         # 注册新配置
-        register_config(test_key, test_value)
+        register_config(test_key, test_value, type(test_value))
         
         # 验证配置存在且值正确
         self.assertTrue(has_config(test_key))
@@ -67,18 +67,18 @@ class TestConfigManager(unittest.TestCase):
     def test_config_validation(self):
         """测试配置验证"""
         # 测试有效的日志级别
-        success = set_config("log_level", "ERROR")
+        success: bool = set_config("log_level", "ERROR")
         self.assertTrue(success)
         
         # 测试无效的日志级别
-        success = set_config("log_level", "INVALID_LEVEL")
+        success: bool = set_config("log_level", "INVALID_LEVEL")
         self.assertFalse(success)
         
         # 测试数值验证
-        success = set_config("ocr_confidence_threshold", 0.8)
+        success: bool = set_config("ocr_confidence_threshold", 0.8)
         self.assertTrue(success)
         
-        success = set_config("ocr_confidence_threshold", 1.5)  # 超出范围
+        success: bool = set_config("ocr_confidence_threshold", 1.5)  # 超出范围
         self.assertFalse(success)
     
     def test_get_all_configs(self):
@@ -94,8 +94,8 @@ class TestConfigManager(unittest.TestCase):
         set_config("log_level", "WARNING")
         set_config("debug_mode", True)
         
-        # 保存配置
-        temp_file = "test_config.json"
+        # 保存配置到临时目录
+        temp_file = os.path.join(self.temp_dir, "test_config.json")
         success = save_config(temp_file)
         self.assertTrue(success)
         
@@ -110,11 +110,7 @@ class TestConfigManager(unittest.TestCase):
         self.assertEqual(get_config("log_level"), "WARNING")
         self.assertEqual(get_config("debug_mode"), True)
         
-        # 清理测试文件
-        config_path = os.path.join(os.path.dirname(__file__), '..', 'core', 'config')
-        test_file_path = os.path.join(config_path, temp_file)
-        if os.path.exists(test_file_path):
-            os.remove(test_file_path)
+        # 不需要额外清理，tearDown会处理temp_dir
     
     def test_config_listeners(self):
         """测试配置监听器"""
@@ -124,8 +120,8 @@ class TestConfigManager(unittest.TestCase):
             changes.append((key, old_value, new_value))
         
         # 添加监听器
-        from core.config import add_config_listener, remove_config_listener
-        add_config_listener("log_level", listener)
+        from core.config import add_config_key_listener, remove_config_key_listener
+        add_config_key_listener("log_level", listener)
         
         # 修改配置
         set_config("log_level", "INFO")
@@ -137,7 +133,7 @@ class TestConfigManager(unittest.TestCase):
         self.assertEqual(changes[0][2], "INFO")
         
         # 移除监听器
-        success = remove_config_listener("log_level", listener)
+        success: bool = remove_config_key_listener("log_level", listener)
         self.assertTrue(success)
         
         # 再次修改配置，监听器不应被调用

@@ -151,8 +151,8 @@ class BackgroundWidget(QWidget):
 class BackgroundManager(BaseComponent):
     """背景管理器"""
     
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
+    def __init__(self, parent: Optional[QWidget] = None, component_id: str = "background"):
+        super().__init__(parent, component_id)
         self._widget = BackgroundWidget(parent)
     
     def create_widget(self) -> QWidget:

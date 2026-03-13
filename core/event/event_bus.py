@@ -3,13 +3,15 @@
 实现事件的发布、订阅和分发功能
 """
 
-from typing import Dict, List, Set, Callable
+from typing import Dict, List, Set, Callable, Type
 from threading import Lock, RLock
 from collections import defaultdict
 import asyncio
 from .base_event import BaseEvent
 from .event_handler import EventHandler, LambdaEventHandler
 from .event_type_registry import EventTypeRegistry
+# 使用项目自定义日志管理器
+from core.logger import error
 
 
 class EventBus:
@@ -35,6 +37,95 @@ class EventBus:
         self._type_registry = EventTypeRegistry()
         self._rw_lock = RLock()
         self._async_enabled = False
+        
+        # 注册UI事件类型
+        self._register_ui_event_types()
+        # 注册调度事件类型
+        self._register_scheduler_event_types()
+    
+    def _register_ui_event_types(self) -> None:
+        """注册UI相关的事件类型"""
+        try:
+            from .events.ui_events import (
+                UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
+                UIMountAreaEvent, UIComponentLifecycleEvent
+            )
+            registry = self._type_registry
+            registry.register_event_type(UIStyleUpdateEvent.EVENT_TYPE, UIStyleUpdateEvent, "ui")
+            registry.register_event_type(UIConfigChangeEvent.EVENT_TYPE, UIConfigChangeEvent, "ui")
+            registry.register_event_type(UIStateChangeEvent.EVENT_TYPE, UIStateChangeEvent, "ui")
+            registry.register_event_type(UIMountAreaEvent.EVENT_TYPE, UIMountAreaEvent, "ui")
+            registry.register_event_type(UIComponentLifecycleEvent.EVENT_TYPE, UIComponentLifecycleEvent, "ui")
+        except ImportError:
+            # 如果UI事件模块不存在，跳过注册（保持向后兼容）
+            pass
+    
+    def _register_scheduler_event_types(self) -> None:
+        """注册调度相关的事件类型"""
+        try:
+            from .events.scheduler_events import (
+                SchedulerStatusEvent, TaskSubmittedEvent, TaskStartedEvent,
+                TaskCompletedEvent, TaskFailedEvent, ProcessCreatedEvent,
+                ProcessStartedEvent, ProcessStoppedEvent, ProcessFailedEvent,
+                TickEvent
+            )
+            registry = self._type_registry
+            registry.register_event_type(SchedulerStatusEvent.EVENT_TYPE, SchedulerStatusEvent, "scheduler")
+            registry.register_event_type(TaskSubmittedEvent.EVENT_TYPE, TaskSubmittedEvent, "scheduler")
+            registry.register_event_type(TaskStartedEvent.EVENT_TYPE, TaskStartedEvent, "scheduler")
+            registry.register_event_type(TaskCompletedEvent.EVENT_TYPE, TaskCompletedEvent, "scheduler")
+            registry.register_event_type(TaskFailedEvent.EVENT_TYPE, TaskFailedEvent, "scheduler")
+            registry.register_event_type(ProcessCreatedEvent.EVENT_TYPE, ProcessCreatedEvent, "scheduler")
+            registry.register_event_type(ProcessStartedEvent.EVENT_TYPE, ProcessStartedEvent, "scheduler")
+            registry.register_event_type(ProcessStoppedEvent.EVENT_TYPE, ProcessStoppedEvent, "scheduler")
+            registry.register_event_type(ProcessFailedEvent.EVENT_TYPE, ProcessFailedEvent, "scheduler")
+            registry.register_event_type(TickEvent.EVENT_TYPE, TickEvent, "scheduler")
+        except ImportError:
+            # 如果调度事件模块不存在，跳过注册（保持向后兼容）
+            pass
+    
+    def _ensure_event_type_registered(self, event_type: str, event_class: Type[BaseEvent]) -> None:
+        """确保事件类型已注册，如果未注册则尝试注册"""
+        if not self._type_registry.is_registered(event_type):
+            # 尝试从已知模块中注册
+            try:
+                if event_type.startswith("scheduler."):
+                    from .events.scheduler_events import (
+                        SchedulerStatusEvent, TaskSubmittedEvent, TaskStartedEvent,
+                        TaskCompletedEvent, TaskFailedEvent, ProcessCreatedEvent,
+                        ProcessStartedEvent, ProcessStoppedEvent, ProcessFailedEvent,
+                        TickEvent
+                    )
+                    scheduler_event_map: Dict[str, Type[BaseEvent]] = {
+                        SchedulerStatusEvent.EVENT_TYPE: SchedulerStatusEvent,
+                        TaskSubmittedEvent.EVENT_TYPE: TaskSubmittedEvent,
+                        TaskStartedEvent.EVENT_TYPE: TaskStartedEvent,
+                        TaskCompletedEvent.EVENT_TYPE: TaskCompletedEvent,
+                        TaskFailedEvent.EVENT_TYPE: TaskFailedEvent,
+                        ProcessCreatedEvent.EVENT_TYPE: ProcessCreatedEvent,
+                        ProcessStartedEvent.EVENT_TYPE: ProcessStartedEvent,
+                        ProcessStoppedEvent.EVENT_TYPE: ProcessStoppedEvent,
+                        ProcessFailedEvent.EVENT_TYPE: ProcessFailedEvent,
+                        TickEvent.EVENT_TYPE: TickEvent
+                    }
+                    if event_type in scheduler_event_map:
+                        self._type_registry.register_event_type(event_type, scheduler_event_map[event_type], "scheduler")
+                elif event_type.startswith("ui."):
+                    from .events.ui_events import (
+                        UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
+                        UIMountAreaEvent, UIComponentLifecycleEvent
+                    )
+                    ui_event_map: Dict[str, Type[BaseEvent]] = {
+                        UIStyleUpdateEvent.EVENT_TYPE: UIStyleUpdateEvent,
+                        UIConfigChangeEvent.EVENT_TYPE: UIConfigChangeEvent,
+                        UIStateChangeEvent.EVENT_TYPE: UIStateChangeEvent,
+                        UIMountAreaEvent.EVENT_TYPE: UIMountAreaEvent,
+                        UIComponentLifecycleEvent.EVENT_TYPE: UIComponentLifecycleEvent
+                    }
+                    if event_type in ui_event_map:
+                        self._type_registry.register_event_type(event_type, ui_event_map[event_type], "ui")
+            except ImportError:
+                pass
     
     def enable_async_support(self) -> None:
         """启用异步事件支持"""
@@ -110,9 +201,8 @@ class EventBus:
         Returns:
             bool: 是否有处理器处理了事件
         """
-        # 由于参数已通过类型注解确保是BaseEvent类型，无需isinstance检查
-        if not self._type_registry.is_registered(event.event_type):
-            raise ValueError(f"Event type '{event.event_type}' is not registered")
+        # 确保事件类型已注册
+        self._ensure_event_type_registered(event.event_type, type(event))
         
         handlers_to_execute = []
         with self._rw_lock:
@@ -128,8 +218,9 @@ class EventBus:
                         handled = True
                         if event.handled:
                             break  # 如果事件已被标记为已处理，停止处理
-                except Exception:
-                    # 处理器异常不应影响其他处理器
+                except Exception as e:
+                    # 记录处理器异常，但不应影响其他处理器
+                    error(f"事件处理器执行失败: {e}", extra={"handler": handler.name, "event_type": event.event_type})
                     continue
         
         return handled
@@ -147,9 +238,8 @@ class EventBus:
         if not self._async_enabled:
             raise RuntimeError("Async support is not enabled. Call enable_async_support() first.")
         
-        # 由于参数已通过类型注解确保是BaseEvent类型，无需isinstance检查
-        if not self._type_registry.is_registered(event.event_type):
-            raise ValueError(f"Event type '{event.event_type}' is not registered")
+        # 确保事件类型已注册
+        self._ensure_event_type_registered(event.event_type, type(event))
         
         handlers_to_execute = []
         with self._rw_lock:
@@ -175,7 +265,9 @@ class EventBus:
         
         for result in results:
             if isinstance(result, Exception):
-                continue  # 处理器异常不应影响其他处理器
+                # 记录处理器异常，但不应影响其他处理器
+                error(f"异步事件处理器执行失败: {result}")
+                continue
             elif result is True:
                 handled = True
         
@@ -188,9 +280,19 @@ class EventBus:
         """
         try:
             return handler.handle(event)
-        except Exception:
-            # 处理器异常不应影响其他处理器
+        except Exception as e:
+            # 记录处理器异常，但不应影响其他处理器
+            error(f"事件处理器执行失败: {e}", extra={"handler": handler.name, "event_type": event.event_type})
             return False
+    
+    def get_type_registry(self) -> EventTypeRegistry:
+        """
+        获取事件类型注册器
+        
+        Returns:
+            EventTypeRegistry: 事件类型注册器实例
+        """
+        return self._type_registry
     
     def get_subscribers_count(self, event_type: str) -> int:
         """

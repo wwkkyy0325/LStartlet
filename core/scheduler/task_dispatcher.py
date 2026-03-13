@@ -10,6 +10,11 @@ from dataclasses import dataclass, field
 import heapq
 from collections import deque
 import time
+# 使用事件系统
+from core.event.events.scheduler_events import (
+    TaskStartedEvent, TaskCompletedEvent, TaskFailedEvent
+)
+from core.event.event_bus import EventBus
 
 
 class TaskPriority(Enum):
@@ -125,6 +130,14 @@ class RoundRobinQueue(TaskQueue):
                 return self._queues[worker_ids[next_worker]].popleft()
         
         return None
+    
+    def size(self) -> int:
+        """获取队列大小"""
+        return sum(len(queue) for queue in self._queues.values())
+    
+    def empty(self) -> bool:
+        """检查队列是否为空"""
+        return all(len(queue) == 0 for queue in self._queues.values())
 
 
 class TaskDispatcher:
@@ -144,6 +157,8 @@ class TaskDispatcher:
         self._active_tasks: Dict[str, asyncio.Task[Any]] = {}
         self._completed_tasks: List[Task] = []
         self._failed_tasks: List[Task] = []
+        # 获取事件总线实例
+        self._event_bus = EventBus()
     
     def _create_queue(self, strategy: str) -> TaskQueue:
         """根据策略创建任务队列"""
@@ -207,6 +222,18 @@ class TaskDispatcher:
         if task is None:
             return None
         
+        # 发布任务开始事件
+        task_data: Dict[str, Any] = {
+            "func_name": getattr(task.func, "__name__", str(task.func)),
+            "priority": task.priority.name,
+            "timeout": task.timeout,
+            "retry_count": task.retry_count,
+            "max_retries": task.max_retries,
+            "args_count": len(task.args),
+            "kwargs_keys": list(task.kwargs.keys())
+        }
+        self._event_bus.publish(TaskStartedEvent(task.task_id, task_data))
+        
         # 创建异步任务
         async_task = asyncio.create_task(self._execute_task(task))
         self._active_tasks[task.task_id] = async_task
@@ -240,9 +267,18 @@ class TaskDispatcher:
             
             # 任务成功完成
             self._completed_tasks.append(task)
+            
+            # 发布任务完成事件
+            task_data: Dict[str, Any] = {
+                "func_name": getattr(task.func, "__name__", str(task.func)),
+                "priority": task.priority.name,
+                "execution_time": time.time() - task.created_at
+            }
+            self._event_bus.publish(TaskCompletedEvent(task.task_id, result, task_data))
+            
             return result
             
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as e:
             # 任务超时
             task.retry_count += 1
             if task.retry_count < task.max_retries:
@@ -250,9 +286,17 @@ class TaskDispatcher:
                 self._task_queue.put(task)
             else:
                 self._failed_tasks.append(task)
+                # 发布任务失败事件
+                task_data: Dict[str, Any] = {
+                    "func_name": getattr(task.func, "__name__", str(task.func)),
+                    "priority": task.priority.name,
+                    "error_type": "TimeoutError",
+                    "retry_count": task.retry_count
+                }
+                self._event_bus.publish(TaskFailedEvent(task.task_id, str(e), task_data))
             raise
             
-        except Exception:
+        except Exception as e:
             # 任务执行异常
             task.retry_count += 1
             if task.retry_count < task.max_retries:
@@ -260,6 +304,14 @@ class TaskDispatcher:
                 self._task_queue.put(task)
             else:
                 self._failed_tasks.append(task)
+                # 发布任务失败事件
+                task_data: Dict[str, Any] = {
+                    "func_name": getattr(task.func, "__name__", str(task.func)),
+                    "priority": task.priority.name,
+                    "error_type": type(e).__name__,
+                    "retry_count": task.retry_count
+                }
+                self._event_bus.publish(TaskFailedEvent(task.task_id, str(e), task_data))
             raise
             
         finally:

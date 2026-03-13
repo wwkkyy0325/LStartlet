@@ -20,7 +20,15 @@ class EventTypeRegistry:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # 注册内置事件类型
+            cls._register_builtin_types()
         return cls._instance
+    
+    @classmethod
+    def _register_builtin_types(cls) -> None:
+        """注册内置事件类型"""
+        # 基础事件类型（如果有的话）
+        pass
     
     @classmethod
     def register_event_type(cls, event_type: str, event_class: Type[BaseEvent], category: str = "general") -> None:

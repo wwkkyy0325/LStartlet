@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from enum import Enum
 # 使用项目自定义日志管理器
 from core.logger import info, warning, error, debug
+# 使用事件系统
+from core.event.events.scheduler_events import TickEvent
+from core.event.event_bus import EventBus
 
 
 class TickState(Enum):
@@ -46,6 +49,8 @@ class TickComponent:
         self._tick_callbacks: List[Callable[[int, float], None]] = []
         self._async_tick_callbacks: List[Callable[[int, float], Awaitable[None]]] = []
         self._task: Optional[asyncio.Task[None]] = None
+        # 获取事件总线实例
+        self._event_bus = EventBus()
         # 移除标准logging，使用项目日志管理器
     
     @property
@@ -192,6 +197,14 @@ class TickComponent:
         
         # 记录tick时间
         self._last_tick_time = current_time
+        
+        # 发布Tick事件
+        tick_data: Dict[str, Any] = {
+            "interval": self.config.interval,
+            "max_ticks": self.config.max_ticks,
+            "callback_count": len(self._tick_callbacks) + len(self._async_tick_callbacks)
+        }
+        self._event_bus.publish(TickEvent(self._current_tick, elapsed_time, tick_data))
         
         if self.config.enable_logging:
             debug(f"Tick {self._current_tick} executed, elapsed={elapsed_time:.3f}s")
