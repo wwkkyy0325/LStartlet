@@ -11,12 +11,17 @@ from core.logger import info, warning
 from core.error import handle_error
 from core.error.exceptions import OCRInitializationError, OCRProcessingError, OCRConfigError
 # 使用事件系统 - 只导入需要的事件
-from core.event.events.scheduler_events import SchedulerStatusEvent, TaskSubmittedEvent
+from core.event.events.scheduler_events import (
+    SchedulerStatusEvent, TaskSubmittedEvent
+)
 from core.event.event_bus import EventBus
 from .config_manager import SchedulerConfig, ConfigManager
 from .process_manager import ProcessManager
 from .task_dispatcher import TaskDispatcher, TaskPriority
 from .tick import TickComponent, TickConfig
+
+# 依赖注入容器
+from core.di.app_container import get_app_container
 
 # 类型变量定义
 T = TypeVar('T')
@@ -33,7 +38,7 @@ class Scheduler:
             config: 调度器配置，如果为None则使用默认配置
         """
         try:
-            self._config_manager = ConfigManager(config)
+            self._config_manager = get_app_container().resolve(ConfigManager)
             self._process_manager = ProcessManager(
                 max_processes=self._config_manager.get_config().max_processes,
                 process_timeout=self._config_manager.get_config().process_timeout
@@ -52,7 +57,7 @@ class Scheduler:
             self._tick_component = TickComponent(tick_config)
             
             # 获取事件总线实例
-            self._event_bus = EventBus()
+            self._event_bus = get_app_container().resolve(EventBus)
             
             self._is_running = False
             info("调度器初始化完成")

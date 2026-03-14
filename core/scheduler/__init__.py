@@ -4,11 +4,13 @@
 """
 
 from .scheduler import Scheduler
-from .process_manager import ProcessManager
 from .task_dispatcher import TaskDispatcher
+from .thread_safe_scheduler import ThreadSafeScheduler
+from .simple_thread_scheduler import SimpleThreadScheduler
 from .config_manager import ConfigManager
 from .scheduler_factory import SchedulerFactory
 from .tick import TickComponent, TickConfig
+from .process_manager import ProcessManager
 
 __all__ = [
     'Scheduler',
@@ -17,5 +19,7 @@ __all__ = [
     'ConfigManager',
     'SchedulerFactory',
     'TickComponent',
-    'TickConfig'
+    'TickConfig',
+    'SimpleThreadScheduler',
+    'ThreadSafeScheduler'
 ]

@@ -82,8 +82,24 @@ class UIComponentManager:
         if self._event_bus is None:
             from core.event.event_bus import EventBus
             self._event_bus = EventBus()
-            # UI事件类型已经在EventBus初始化时注册，无需再次注册
-            # 这里只是确保事件总线已正确初始化
+            # 注册UI事件类型（如果尚未注册）
+            from core.event.events.ui_events import (
+                UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
+                UIMountAreaEvent, UIComponentLifecycleEvent
+            )
+            from core.event.event_type_registry import EventTypeRegistry
+            
+            registry = EventTypeRegistry()
+            if not registry.is_registered(UIStyleUpdateEvent.EVENT_TYPE):
+                registry.register_event_type(UIStyleUpdateEvent.EVENT_TYPE, UIStyleUpdateEvent, "ui")
+            if not registry.is_registered(UIConfigChangeEvent.EVENT_TYPE):
+                registry.register_event_type(UIConfigChangeEvent.EVENT_TYPE, UIConfigChangeEvent, "ui")
+            if not registry.is_registered(UIStateChangeEvent.EVENT_TYPE):
+                registry.register_event_type(UIStateChangeEvent.EVENT_TYPE, UIStateChangeEvent, "ui")
+            if not registry.is_registered(UIMountAreaEvent.EVENT_TYPE):
+                registry.register_event_type(UIMountAreaEvent.EVENT_TYPE, UIMountAreaEvent, "ui")
+            if not registry.is_registered(UIComponentLifecycleEvent.EVENT_TYPE):
+                registry.register_event_type(UIComponentLifecycleEvent.EVENT_TYPE, UIComponentLifecycleEvent, "ui")
         
         return self._event_bus
     

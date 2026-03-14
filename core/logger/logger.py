@@ -42,7 +42,7 @@ class LoggerCore:
         for handler in self.handlers[:]:  # 使用切片复制避免修改过程中迭代
             try:
                 if hasattr(handler, 'close'):
-                    handler.close()
+                    handler.close()  # type: ignore
                 self.remove_handler(handler)
             except Exception as e:
                 print(f"Error closing logger handler: {e}", file=sys.stderr)
@@ -144,6 +144,16 @@ class MultiProcessLogger:
             if process_type not in self._loggers:
                 self._loggers[process_type] = LoggerCore(name=f"{process_type}_logger")
             return self._loggers[process_type]
+    
+    def get_logger_names(self) -> List[str]:
+        """获取所有已注册的日志器名称列表"""
+        with self._lock:
+            return list(self._loggers.keys())
+    
+    def get_all_loggers(self) -> Dict[str, LoggerCore]:
+        """获取所有已注册的日志器字典"""
+        with self._lock:
+            return self._loggers.copy()
     
     def set_default_process(self, process_type: str) -> None:
         """设置默认进程类型"""

@@ -10,6 +10,8 @@ from .button_style import StyledButton, ButtonStyles, create_styled_button, crea
 from .custom_border import CustomBorderManager
 from .mount_area import MountArea, MountAreaWidget
 from .ui_event_handler import UIComponentEventHandler, UIComponentManager
+from .cursor_widget import CursorWidget
+from .frosted_glass_window import FrostedGlassWindow
 
 # 弹窗组件
 from .dialog import (
@@ -32,6 +34,8 @@ __all__ = [
     'MountAreaWidget',
     'UIComponentEventHandler',
     'UIComponentManager',
+    'CursorWidget',
+    'FrostedGlassWindow',
     # 弹窗组件
     'FileSelectDialog',
     'select_image_and_pdf_files', 

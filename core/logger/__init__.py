@@ -1,3 +1,4 @@
+import sys
 from typing import Optional, Dict, Any
 from .logger import MultiProcessLogger, LoggerCore
 from .level import LogLevel
@@ -35,8 +36,8 @@ def _register_lifecycle_listeners() -> None:
                     if event.lifecycle_stage in ("stopping", "stopped"):
                         # 关闭所有日志处理器
                         manager = _get_logger_manager()
-                        for logger_name in list(manager._loggers.keys()):
-                            logger = manager._loggers[logger_name]
+                        all_loggers = manager.get_all_loggers()
+                        for logger in all_loggers.values():
                             logger.close_handlers()
                         info("日志管理器：所有日志处理器已关闭")
                 return True

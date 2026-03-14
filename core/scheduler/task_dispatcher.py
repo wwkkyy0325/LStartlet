@@ -15,14 +15,18 @@ from core.event.events.scheduler_events import (
     TaskStartedEvent, TaskCompletedEvent, TaskFailedEvent
 )
 from core.event.event_bus import EventBus
+# 依赖注入容器
+from core.di.app_container import get_app_container
+# 使用项目自定义日志管理器
+from core.logger import info
 
 
 class TaskPriority(Enum):
     """任务优先级枚举"""
-    LOW = 10
-    NORMAL = 20
-    HIGH = 30
-    CRITICAL = 40
+    LOW = 3
+    NORMAL = 2
+    HIGH = 1
+    CRITICAL = 0
 
 
 @dataclass
@@ -158,7 +162,8 @@ class TaskDispatcher:
         self._completed_tasks: List[Task] = []
         self._failed_tasks: List[Task] = []
         # 获取事件总线实例
-        self._event_bus = EventBus()
+        self._event_bus = get_app_container().resolve(EventBus)
+        info(f"任务分发器初始化完成 (策略: {strategy}, 最大并发任务数: {max_concurrent_tasks})")
     
     def _create_queue(self, strategy: str) -> TaskQueue:
         """根据策略创建任务队列"""

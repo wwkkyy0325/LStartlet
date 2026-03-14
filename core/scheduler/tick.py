@@ -13,6 +13,8 @@ from core.logger import info, warning, error, debug
 # 使用事件系统
 from core.event.events.scheduler_events import TickEvent
 from core.event.event_bus import EventBus
+# 依赖注入容器
+from core.di.app_container import get_app_container
 
 
 class TickState(Enum):
@@ -50,7 +52,7 @@ class TickComponent:
         self._async_tick_callbacks: List[Callable[[int, float], Awaitable[None]]] = []
         self._task: Optional[asyncio.Task[None]] = None
         # 获取事件总线实例
-        self._event_bus = EventBus()
+        self._event_bus = get_app_container().resolve(EventBus)
         # 移除标准logging，使用项目日志管理器
     
     @property

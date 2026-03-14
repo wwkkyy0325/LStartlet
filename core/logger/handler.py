@@ -20,6 +20,10 @@ class BaseHandler:
     def should_emit(self, record: LogRecord) -> bool:
         """判断是否应该输出该日志记录"""
         return record.level >= self.level
+    
+    def close(self) -> None:
+        """关闭处理器，释放资源"""
+        pass
 
 
 class ConsoleHandler(BaseHandler):

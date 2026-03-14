@@ -1,7 +1,14 @@
+# -*- coding: utf-8 -*-
 """
 OCR项目主入口文件
 负责初始化配置、注册核心工具、启动主进程和渲染进程
 """
+
+# =============== 日志级别配置 ===============
+# 可选值: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# 修改此处即可改变日志输出级别
+LOG_LEVEL = "DEBUG"
+# =========================================
 
 import os
 import sys
@@ -17,29 +24,25 @@ from core.path import get_project_root, join_paths
 from core.event.event_bus import EventBus
 from core.event.events.ui_events import RenderProcessReadyEvent
 from core.event.events.scheduler_events import ApplicationLifecycleEvent, ProcessStartedEvent
+from core.scheduler.tick import TickComponent, TickConfig
+from ui.ui_factory import UIFactory  # 添加tick相关导入
 
-# UI模块导入
-from ui import UIFactory
-from ui.core.standard_window_manager import StandardWindowManager  # type: ignore
-
-
-# =============== 日志级别配置 ===============
-# 可选值: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
-# 修改此处即可改变日志输出级别
-LOG_LEVEL = "DEBUG"
-# =========================================
+# 依赖注入容器（延迟导入）
+from core.di import ServiceContainer, ServiceLifetime
 
 
 class MainApplication:
     """主应用程序类"""
     
     def __init__(self):
+        self.container: ServiceContainer = ServiceContainer()  # 初始化为实际实例，避免None
         self.config_manager = None
         self.event_bus = None
         self.render_process_ready = False
         self.custom_ui_callback = None
         self.render_process_thread = None
         self.qt_app = None
+        self.tick_component = None  # 添加tick组件引用
         
     def initialize(self) -> bool:
         """初始化应用程序"""
@@ -60,21 +63,33 @@ class MainApplication:
             
             info("开始初始化OCR主应用程序...")
             
-            # 1. 检查并初始化配置文件
+            # 1. 初始化依赖注入容器
+            if not self._initialize_di_container():
+                error("依赖注入容器初始化失败")
+                return False
+            
+            # 2. 检查并初始化配置文件
             if not self._initialize_config():
                 error("配置初始化失败")
                 return False
             
-            # 2. 初始化事件总线
-            self.event_bus = EventBus()
+            # 3. 获取事件总线实例（从DI容器）
+            self.event_bus = self.container.resolve(EventBus)
             
-            # 3. 注册核心工具和组件
+            # 4. 初始化20Hz的tick系统 (每50ms一个tick)
+            if not self._initialize_tick_system():
+                error("Tick系统初始化失败")
+                return False
+            
+            # 5. 注册核心工具和组件
             if not self._register_core_components():
                 error("核心组件注册失败")
                 return False
             
-            # 4. 初始化UI工厂（在核心组件注册完成后）
-            self.ui_factory = UIFactory(self.event_bus)
+            # 6. 初始化UI工厂（在核心组件注册完成后）
+            assert self.event_bus is not None
+            assert self.tick_component is not None
+            self.ui_factory = UIFactory()
             self.ui_factory.register_event_listeners()
             
             info("主应用程序初始化完成")
@@ -82,6 +97,21 @@ class MainApplication:
             
         except Exception as e:
             error(f"应用程序初始化异常: {e}")
+            handle_error(e)
+            return False
+    
+    def _initialize_di_container(self) -> bool:
+        """初始化依赖注入容器"""
+        try:
+            # 容器已经在__init__中初始化，这里只需要注册服务
+            self.container.register(ConfigManager, lifetime=ServiceLifetime.SINGLETON)
+            self.container.register(EventBus, lifetime=ServiceLifetime.SINGLETON)
+            
+            info("依赖注入容器初始化完成")
+            return True
+            
+        except Exception as e:
+            error(f"依赖注入容器初始化失败: {e}")
             handle_error(e)
             return False
     
@@ -94,18 +124,43 @@ class MainApplication:
             # 检查配置文件是否存在
             if not os.path.exists(config_file):
                 info("配置文件不存在，创建默认配置文件...")
-                self.config_manager = ConfigManager(config_file)
+                self.config_manager = self.container.resolve(ConfigManager)
                 # 保存默认配置到文件
                 self.config_manager.save_to_file(config_file)
                 info(f"默认配置文件已创建: {config_file}")
             else:
                 info(f"加载现有配置文件: {config_file}")
-                self.config_manager = ConfigManager(config_file)
+                self.config_manager = self.container.resolve(ConfigManager)
             
             return True
             
         except Exception as e:
             error(f"配置初始化失败: {e}")
+            handle_error(e)
+            return False
+    
+    def _initialize_tick_system(self) -> bool:
+        """初始化20Hz的tick系统"""
+        try:
+            # 创建20Hz的tick配置 (50ms间隔)
+            tick_config = TickConfig(
+                interval=0.05,  # 50ms = 20Hz
+                auto_start=True,
+                enable_logging=False
+            )
+            
+            self.tick_component = TickComponent(tick_config)
+            
+            # 将 TickComponent 注册到全局容器中
+            from core.di.app_container import get_app_container
+            global_container = get_app_container()
+            global_container.register(TickComponent, instance=self.tick_component, lifetime=ServiceLifetime.SINGLETON)
+            
+            info("20Hz Tick系统初始化完成")
+            return True
+            
+        except Exception as e:
+            error(f"Tick系统初始化失败: {e}")
             handle_error(e)
             return False
     
@@ -302,3 +357,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

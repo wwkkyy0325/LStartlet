@@ -7,11 +7,23 @@ import multiprocessing as mp
 import os
 import time
 from typing import Dict, Any
+from dataclasses import dataclass
 # 使用项目自定义日志管理器
 from core.logger import info, warning, error
 from core.event.event_bus import EventBus
 from core.event.events.scheduler_events import ProcessCreatedEvent, ProcessStartedEvent, ProcessStoppedEvent
 from core.process import GlobalProcessManager
+# 依赖注入容器
+from core.di.app_container import get_app_container
+
+
+@dataclass
+class ProcessInfo:
+    """进程信息数据类"""
+    process: mp.Process
+    start_time: float
+    last_heartbeat: float
+    task_count: int = 0
 
 
 class ProcessManager:
@@ -27,14 +39,14 @@ class ProcessManager:
         """
         self.max_processes = max_processes
         self.process_timeout = process_timeout
-        self._processes: Dict[str, mp.Process] = {}
-        self._active_count = 0
+        self._processes: Dict[str, ProcessInfo] = {}
+        self._is_running = False
         # 获取事件总线实例
-        self._event_bus = EventBus()
+        self._event_bus = get_app_container().resolve(EventBus)
     
     def start(self) -> None:
         """启动进程管理器"""
-        if self._active_count > 0:
+        if self._is_running:
             warning("Process manager is already running")
             return
         
@@ -47,7 +59,13 @@ class ProcessManager:
                 daemon=True
             )
             
-            self._processes[worker_id] = process
+            # 创建进程信息对象
+            process_info = ProcessInfo(
+                process=process,
+                start_time=time.time(),
+                last_heartbeat=time.time()
+            )
+            self._processes[worker_id] = process_info
             
             # 发布进程创建事件
             process_data: Dict[str, Any] = {
@@ -59,7 +77,6 @@ class ProcessManager:
             self._event_bus.publish(ProcessCreatedEvent(i, process_data))
             
             process.start()
-            self._active_count += 1
             
             # 注册到全局进程管理器（确保pid不为None）
             if process.pid is not None:
@@ -72,6 +89,7 @@ class ProcessManager:
             else:
                 warning(f"工作进程 {worker_id} 的PID为None，无法注册到全局进程管理器")
         
+        self._is_running = True
         info(f"Process manager started with {self.max_processes} workers")
     
     def _worker_process(self, worker_id: str, process_id: int) -> None:
@@ -114,11 +132,12 @@ class ProcessManager:
     
     def stop(self) -> None:
         """停止进程管理器"""
-        if self._active_count == 0:
+        if not self._is_running:
             return
         
         # 停止所有工作进程
-        for process in self._processes.values():
+        for process_info in self._processes.values():
+            process = process_info.process
             if process.is_alive():
                 # 先尝试正常终止
                 process.terminate()
@@ -132,13 +151,17 @@ class ProcessManager:
                     GlobalProcessManager().terminate_process(process.pid, force=True)
         
         self._processes.clear()
-        self._active_count = 0
+        self._is_running = False
         
         info("Process manager stopped successfully")
     
     def get_active_process_count(self) -> int:
         """获取活跃进程数量"""
-        return self._active_count
+        count = 0
+        for process_info in self._processes.values():
+            if process_info.process.is_alive():
+                count += 1
+        return count
     
     def submit_task(self, task_data: Any) -> bool:
         """
@@ -156,11 +179,17 @@ class ProcessManager:
     def get_all_processes_status(self) -> Dict[str, Dict[str, Any]]:
         """获取所有进程的状态"""
         status_dict: Dict[str, Dict[str, Any]] = {}
-        for worker_id, process in self._processes.items():
+        for worker_id, process_info in self._processes.items():
+            process = process_info.process
+            is_alive = process.is_alive()
             status_dict[worker_id] = {
                 'worker_id': worker_id,
-                'is_alive': process.is_alive(),
-                'status': 'running' if process.is_alive() else 'stopped',
-                'pid': process.pid if process.pid else None
+                'is_alive': is_alive,
+                'status': 'running' if is_alive else 'stopped',
+                'pid': process.pid if process.pid else None,
+                'start_time': process_info.start_time,
+                'last_heartbeat': process_info.last_heartbeat,
+                'task_count': process_info.task_count,
+                'uptime': time.time() - process_info.start_time if is_alive else 0
             }
         return status_dict
