@@ -10,6 +10,7 @@ OCR项目主入口文件
 LOG_LEVEL = "DEBUG"
 # =========================================
 
+from logging import warning
 import os
 import sys
 import time
@@ -27,6 +28,10 @@ from core.event.events.scheduler_events import ApplicationLifecycleEvent, Proces
 from core.scheduler.tick import TickComponent, TickConfig
 from ui.ui_factory import UIFactory  # 添加tick相关导入
 
+# 新增模块导入
+from plugin import initialize_plugin_system
+from core.persistence import initialize_persistence_system
+
 # 依赖注入容器（延迟导入）
 from core.di import ServiceContainer, ServiceLifetime
 
@@ -43,6 +48,8 @@ class MainApplication:
         self.render_process_thread = None
         self.qt_app = None
         self.tick_component = None  # 添加tick组件引用
+        self.plugin_manager = None  # 插件管理器
+        self.persistence_manager = None  # 持久化管理器
         
     def initialize(self) -> bool:
         """初始化应用程序"""
@@ -68,25 +75,35 @@ class MainApplication:
                 error("依赖注入容器初始化失败")
                 return False
             
-            # 2. 检查并初始化配置文件
+            # 2. 初始化持久化系统
+            if not self._initialize_persistence_system():
+                error("持久化系统初始化失败")
+                return False
+            
+            # 3. 检查并初始化配置文件
             if not self._initialize_config():
                 error("配置初始化失败")
                 return False
             
-            # 3. 获取事件总线实例（从DI容器）
+            # 4. 获取事件总线实例（从DI容器）
             self.event_bus = self.container.resolve(EventBus)
             
-            # 4. 初始化20Hz的tick系统 (每50ms一个tick)
+            # 5. 初始化20Hz的tick系统 (每50ms一个tick)
             if not self._initialize_tick_system():
                 error("Tick系统初始化失败")
                 return False
             
-            # 5. 注册核心工具和组件
+            # 6. 初始化插件系统
+            if not self._initialize_plugin_system():
+                error("插件系统初始化失败")
+                return False
+            
+            # 7. 注册核心工具和组件
             if not self._register_core_components():
                 error("核心组件注册失败")
                 return False
             
-            # 6. 初始化UI工厂（在核心组件注册完成后）
+            # 8. 初始化UI工厂（在核心组件注册完成后）
             assert self.event_bus is not None
             assert self.tick_component is not None
             self.ui_factory = UIFactory()
@@ -161,6 +178,51 @@ class MainApplication:
             
         except Exception as e:
             error(f"Tick系统初始化失败: {e}")
+            handle_error(e)
+            return False
+    
+    def _initialize_persistence_system(self) -> bool:
+        """初始化持久化系统"""
+        try:
+            project_root = get_project_root()
+            data_dir = join_paths(project_root, "data")
+            
+            self.persistence_manager = initialize_persistence_system(self.container, data_dir)
+            
+            info("持久化系统初始化完成")
+            return True
+            
+        except Exception as e:
+            error(f"持久化系统初始化失败: {e}")
+            handle_error(e)
+            return False
+    
+    def _initialize_plugin_system(self) -> bool:
+        """初始化插件系统"""
+        try:
+            assert self.event_bus is not None
+            
+            self.plugin_manager = initialize_plugin_system(self.container, self.event_bus)
+            
+            # 暂时不自动加载插件目录中的插件
+            # project_root = get_project_root()
+            # plugin_dir = join_paths(project_root, "plugins")
+            # 
+            # if os.path.exists(plugin_dir):
+            #     self.plugin_manager.load_plugins([plugin_dir])
+            #     info(f"加载插件目录: {plugin_dir}")
+            # else:
+            #     info("插件目录不存在，跳过插件加载")
+            
+            # 初始化所有插件（目前为空）
+            if not self.plugin_manager.initialize_all_plugins():
+                warning("部分插件初始化失败，但继续启动应用")
+            
+            info("插件系统初始化完成")
+            return True
+            
+        except Exception as e:
+            error(f"插件系统初始化失败: {e}")
             handle_error(e)
             return False
     
@@ -289,6 +351,14 @@ class MainApplication:
         """清理资源"""
         try:
             info("开始清理应用程序资源...")
+            
+            # 清理插件系统
+            if self.plugin_manager:
+                self.plugin_manager.cleanup_all_plugins()
+            
+            # 清理持久化系统
+            if self.persistence_manager:
+                self.persistence_manager.close_all_storages()
             
             # 清理UI资源
             if self.ui_factory:
