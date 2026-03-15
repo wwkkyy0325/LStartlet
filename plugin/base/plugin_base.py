@@ -66,6 +66,10 @@ class PluginBase(ABC):
         Returns:
             依赖字典，格式: {"dependency_name": "version_requirement"}
             例如: {"core": ">=1.0.0", "ui": ">=1.0.0"}
+            
+        Note:
+            推荐使用类属性 PLUGIN_DEPENDENCIES 进行静态依赖声明，
+            这样可以在不实例化插件的情况下解析依赖。
         """
         pass
     

@@ -4,7 +4,7 @@
 """
 
 from typing import Dict, Any, Optional
-from .error_handler import ErrorHandler, register_global_error_handler
+from .error_handler import ErrorHandler, register_global_error_handler # type: ignore
 from .formatter import ErrorFormatter
 
 # 创建全局错误处理器实例
@@ -27,5 +27,5 @@ def get_error_info(exception: Exception) -> Dict[str, Any]:
     """获取错误详细信息"""
     return ErrorFormatter.get_error_info(exception)
 
-# 注册全局错误处理器
-register_global_error_handler()
+# 移除顶层的全局错误处理器注册
+# 根据项目规范，应在主程序入口统一注册

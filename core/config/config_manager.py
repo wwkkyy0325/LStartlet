@@ -14,6 +14,17 @@ from core.error.exceptions import OCRConfigError
 from .config_item import ConfigItem
 
 
+def _validate_log_level(value: str) -> bool:
+    """验证日志级别"""
+    valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    return value in valid_levels
+
+
+def _validate_confidence_threshold(value: float) -> bool:
+    """验证置信度阈值（0.0 - 1.0）"""
+    return 0.0 <= value <= 1.0
+
+
 class ConfigManager:
     """配置管理器"""
     
@@ -49,15 +60,72 @@ class ConfigManager:
                 self.save_to_file()
             
             # 注册应用程序生命周期事件监听器
-            self._register_lifecycle_listeners()
+            self._register_app_lifecycle_listeners()
             
             info("配置管理器初始化完成")
         except Exception as e:
             error_msg = f"配置管理器初始化失败: {e}"
-            handle_error(OCRConfigError(error_msg, context={"config_file": self._config_file}))
+            handle_error(OCRConfigError(error_msg))
+            raise
+
+    def _register_default_configs(self) -> None:
+        """注册默认配置项（标记为系统来源）"""
+        try:
+            # 应用程序配置
+            self.register_config_with_source("app_name", "OCR_Tool", str, "应用程序名称", plugin_name="system")
+            self.register_config_with_source("debug_mode", False, bool, "调试模式开关", plugin_name="system")
+            
+            # OCR相关配置
+            self.register_config_with_source("ocr_engine", "paddle", str, "OCR引擎类型 (paddle/tesseract)", plugin_name="system")
+            self.register_config_with_source("language", "ch", str, "识别语言 (ch/en/...)", plugin_name="system")
+            self.register_config_with_source("use_gpu", False, bool, "是否使用GPU加速", plugin_name="system")
+            self.register_config_with_source("gpu_id", 0, int, "GPU设备ID", plugin_name="system")
+            
+            # 日志配置
+            self.register_config_with_source("log_level", "DEBUG", str, "日志级别 (DEBUG/INFO/WARNING/ERROR)", 
+                                           validator=_validate_log_level, plugin_name="system")
+            
+            # 图像预处理配置
+            self.register_config_with_source("preprocess_enabled", True, bool, "是否启用图像预处理", plugin_name="system")
+            self.register_config_with_source("denoise_enabled", True, bool, "是否启用降噪", plugin_name="system")
+            self.register_config_with_source("binarize_enabled", True, bool, "是否启用二值化", plugin_name="system")
+            self.register_config_with_source("deskew_enabled", True, bool, "是否启用倾斜校正", plugin_name="system")
+            
+            # 性能配置
+            self.register_config_with_source("max_workers", 4, int, "最大工作线程数", plugin_name="system")
+            self.register_config_with_source("batch_size", 1, int, "批处理大小", plugin_name="system")
+            self.register_config_with_source("timeout", 30.0, float, "处理超时时间（秒）", plugin_name="system")
+            
+            # 输出配置
+            self.register_config_with_source("output_format", "text", str, "输出格式 (text/json)", plugin_name="system")
+            self.register_config_with_source("ocr_confidence_threshold", 0.5, float, "OCR置信度阈值", 
+                                           validator=_validate_confidence_threshold, plugin_name="system")
+            self.register_config_with_source("save_debug_images", False, bool, "是否保存调试图像", plugin_name="system")
+        except Exception as e:
+            error_msg = f"注册默认配置项失败: {e}"
+            handle_error(OCRConfigError(error_msg))
             raise
     
-    def _register_lifecycle_listeners(self) -> None:
+    def _publish_config_registration_event(self) -> None:
+        """发布配置项注册事件，允许外部模块注册自定义配置项"""
+        try:
+            from core.event.event_bus import EventBus
+            from core.event.events.scheduler_events import ConfigItemRegisteredEvent
+            
+            event_bus = EventBus()
+            config_register_event = ConfigItemRegisteredEvent(self, plugin_name="external")
+            event_bus.publish(config_register_event)
+            
+            debug("已发布配置项注册事件，允许外部模块注册自定义配置项")
+        except ImportError:
+            # 如果事件系统不可用，跳过事件发布（保持向后兼容）
+            debug("事件系统不可用，跳过配置项注册事件发布")
+        except Exception as e:
+            error(f"发布配置项注册事件失败: {e}")
+            # 不抛出异常，确保配置管理器仍能正常初始化
+            pass
+    
+    def _register_app_lifecycle_listeners(self) -> None:
         """注册应用程序生命周期事件监听器"""
         try:
             from core.event.event_bus import EventBus
@@ -170,54 +238,6 @@ class ConfigManager:
         else:
             # 对于其他类型，统一转换为字符串
             return str
-    
-    def _publish_config_registration_event(self) -> None:
-        """发布配置项注册事件，允许外部模块注册自定义配置项"""
-        try:
-            from core.event.event_bus import EventBus
-            from core.event.events.scheduler_events import ConfigItemRegisteredEvent
-            
-            event_bus = EventBus()
-            config_register_event = ConfigItemRegisteredEvent(self, plugin_name="external")
-            event_bus.publish(config_register_event)
-            
-            debug("已发布配置项注册事件，允许外部模块注册自定义配置项")
-        except ImportError:
-            # 如果事件系统不可用，跳过事件发布（保持向后兼容）
-            debug("事件系统不可用，跳过配置项注册事件发布")
-        except Exception as e:
-            error(f"发布配置项注册事件失败: {e}")
-            # 不抛出异常，确保配置管理器仍能正常初始化
-            pass
-    
-    def _register_default_configs(self) -> None:
-        """注册默认配置项（标记为系统来源）"""
-        try:
-            # OCR相关配置
-            self.register_config_with_source("ocr_engine", "paddle", str, "OCR引擎类型 (paddle/tesseract)", plugin_name="system")
-            self.register_config_with_source("language", "ch", str, "识别语言 (ch/en/...)", plugin_name="system")
-            self.register_config_with_source("use_gpu", False, bool, "是否使用GPU加速", plugin_name="system")
-            self.register_config_with_source("gpu_id", 0, int, "GPU设备ID", plugin_name="system")
-            
-            # 图像预处理配置
-            self.register_config_with_source("preprocess_enabled", True, bool, "是否启用图像预处理", plugin_name="system")
-            self.register_config_with_source("denoise_enabled", True, bool, "是否启用降噪", plugin_name="system")
-            self.register_config_with_source("binarize_enabled", True, bool, "是否启用二值化", plugin_name="system")
-            self.register_config_with_source("deskew_enabled", True, bool, "是否启用倾斜校正", plugin_name="system")
-            
-            # 性能配置
-            self.register_config_with_source("max_workers", 4, int, "最大工作线程数", plugin_name="system")
-            self.register_config_with_source("batch_size", 1, int, "批处理大小", plugin_name="system")
-            self.register_config_with_source("timeout", 30.0, float, "处理超时时间（秒）", plugin_name="system")
-            
-            # 输出配置
-            self.register_config_with_source("output_format", "text", str, "输出格式 (text/json)", plugin_name="system")
-            self.register_config_with_source("confidence_threshold", 0.5, float, "置信度阈值", plugin_name="system")
-            self.register_config_with_source("save_debug_images", False, bool, "是否保存调试图像", plugin_name="system")
-        except Exception as e:
-            error_msg = f"注册默认配置项失败: {e}"
-            handle_error(OCRConfigError(error_msg))
-            raise
     
     def register_config_with_source(
         self, 

@@ -20,7 +20,7 @@ from typing import cast
 from core.config.config_manager import ConfigManager
 from core.logger import configure_logger, info, error, set_process_type
 from core.logger.level import LogLevel  # 添加LogLevel导入
-from core.error import handle_error
+from core.error import handle_error, register_global_error_handler  # 添加register_global_error_handler导入
 from core.path import get_project_root, join_paths
 from core.event.event_bus import EventBus
 from core.event.events.ui_events import RenderProcessReadyEvent
@@ -54,6 +54,9 @@ class MainApplication:
     def initialize(self) -> bool:
         """初始化应用程序"""
         try:
+            # 注册全局错误处理器（在日志配置之前）
+            register_global_error_handler()
+            
             # 设置当前进程类型为主进程
             set_process_type("main")
             
@@ -427,4 +430,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

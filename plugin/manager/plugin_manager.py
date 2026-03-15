@@ -10,6 +10,7 @@ from threading import Lock
 from plugin.base.plugin_base import PluginBase
 from plugin.base.plugin_interface import IPluginManager, IPlugin
 from plugin.manager.plugin_loader import PluginLoader
+from plugin.manager.dependency_manager import PluginDependencyManager
 from plugin.exceptions.plugin_exceptions import PluginLoadError, PluginInitializeError
 from plugin.events.plugin_events import (
     PluginLoadedEvent, PluginUnloadedEvent, PluginInitializedEvent,
@@ -36,6 +37,7 @@ class PluginManager(IPluginManager):
         self._plugins: Dict[str, PluginBase] = {}
         self._plugin_classes: Dict[str, Type[PluginBase]] = {}
         self._loader = PluginLoader()
+        self._dependency_manager = PluginDependencyManager()
         self._lock = Lock()
         self._is_initialized = False
         
@@ -187,6 +189,24 @@ class PluginManager(IPluginManager):
                     continue
                 
                 try:
+                    # 尝试从类属性获取依赖（支持静态声明）
+                    dependencies = {}
+                    if hasattr(plugin_class, 'PLUGIN_DEPENDENCIES'):
+                        dependencies = getattr(plugin_class, 'PLUGIN_DEPENDENCIES', {})
+                    else:
+                        # 如果没有静态声明，尝试创建临时实例获取依赖
+                        try:
+                            temp_plugin = plugin_class(plugin_id, plugin_id, "1.0.0")
+                            dependencies = temp_plugin.get_dependencies()
+                        except Exception as e:
+                            warning(f"无法获取插件 {plugin_id} 的依赖信息: {e}")
+                            dependencies = {}
+                    
+                    if not self._dependency_manager.resolve_dependencies(plugin_id, dependencies):
+                        warning(f"插件 {plugin_id} 的依赖解析失败，跳过初始化")
+                        success = False
+                        continue
+                    
                     # 创建插件实例
                     plugin = self._create_plugin_instance(plugin_class, plugin_id)
                     if plugin is None:
@@ -406,6 +426,10 @@ class PluginManager(IPluginManager):
                 except Exception as e:
                     error(f"插件 {plugin.plugin_id} 清理时发生未预期错误: {e}")
                     success = False
+        
+        # 清理插件依赖
+        for plugin_id in list(self._plugin_classes.keys()):
+            self._dependency_manager.cleanup_plugin_dependencies(plugin_id)
         
         # 清空插件列表
         self._plugins.clear()

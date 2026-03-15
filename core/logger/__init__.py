@@ -1,4 +1,4 @@
-import sys
+import sys # type: ignore
 from typing import Optional, Dict, Any
 from .logger import MultiProcessLogger, LoggerCore
 from .level import LogLevel
@@ -42,6 +42,8 @@ def _register_lifecycle_listeners() -> None:
                         info("日志管理器：所有日志处理器已关闭")
                 return True
             except Exception as e:
+                # 确保sys可用
+                import sys
                 print(f"Error in logger lifecycle handler: {e}", file=sys.stderr)
                 return False
         
@@ -56,16 +58,26 @@ def _register_lifecycle_listeners() -> None:
         # 如果事件系统不可用，跳过事件监听器注册
         pass
     except Exception as e:
+        # 确保sys可用
+        import sys
         print(f"Failed to register logger lifecycle listeners: {e}", file=sys.stderr)
 
 
 def _get_current_logger() -> LoggerCore:
     """获取当前进程的日志器"""
-    manager = _get_logger_manager()
-    # 这里可以根据实际的进程环境自动检测进程类型
-    # 为了简化，我们使用环境变量或默认为主进程
-    process_type = os.getenv('LOG_PROCESS_TYPE', 'main')
-    return manager.get_logger(process_type)
+    try:
+        manager = _get_logger_manager()
+        # 这里可以根据实际的进程环境自动检测进程类型
+        # 为了简化，我们使用环境变量或默认为主进程
+        process_type = os.getenv('LOG_PROCESS_TYPE', 'main')
+        return manager.get_logger(process_type)
+    except Exception as e:
+        # 如果获取日志器失败，创建一个简单的备用日志器
+        import sys
+        print(f"Warning: Failed to get logger, using fallback: {e}", file=sys.stderr)
+        # 返回一个简单的日志器实例，避免完全失败
+        fallback_logger = LoggerCore(name="fallback", level=LogLevel.WARNING)
+        return fallback_logger
 
 
 def configure_logger(
@@ -160,8 +172,8 @@ def critical(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
     _get_current_logger().critical(message, extra)
 
 
-# 设置默认配置 - 使用项目根目录下的logs目录
-configure_logger()
+# 移除顶层的configure_logger()调用，避免模块导入时立即执行初始化
+# 根据项目规范，日志配置应在主程序入口统一执行
 
 # 注册退出清理
 def _cleanup():

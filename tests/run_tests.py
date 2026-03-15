@@ -31,6 +31,11 @@ def create_test_suite():
     suite.addTests(loader.loadTestsFromName('tests.test_di_container'))
     suite.addTests(loader.loadTestsFromName('tests.test_simple_thread_scheduler'))
     
+    # 插件系统测试
+    suite.addTests(loader.loadTestsFromName('tests.test_plugin_loader'))
+    suite.addTests(loader.loadTestsFromName('tests.test_plugin_manager'))
+    suite.addTests(loader.loadTestsFromName('tests.test_plugin_dependency_manager'))
+    
     return suite
 
 
