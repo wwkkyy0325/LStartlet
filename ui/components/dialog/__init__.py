@@ -2,18 +2,12 @@
 弹窗组件模块入口
 """
 
-from .file_select_dialog import (
-    FileSelectDialog,
-    select_image_and_pdf_files,
-    select_directory_for_ocr,
-    FileFilters,
-    FileValidators
-)
+from .file_select_dialog import FileSelectDialog
+from .settings_dialog import SettingsDialog
+from .settings_content import SettingsContentWidget
 
 __all__ = [
     'FileSelectDialog',
-    'select_image_and_pdf_files', 
-    'select_directory_for_ocr',
-    'FileFilters',
-    'FileValidators'
+    'SettingsDialog',
+    'SettingsContentWidget'
 ]

@@ -9,7 +9,7 @@ from ..config.ui_config import UIConfig, UIConfigManager
 from ..state.ui_state import UIState
 from ..state.ui_state_manager import UIStateManager
 from ..components.background import BackgroundManager
-from ..components.mount_area import MountArea
+from ..components.simple_mount_area import SimpleMountArea
 
 
 class AbstractUIManager:
@@ -22,7 +22,7 @@ class AbstractUIManager:
         
         # 组件管理器
         self.background_manager: Optional[BackgroundManager] = None
-        self.mount_area_manager: Optional[MountArea] = None
+        self.mount_area_manager: Optional[SimpleMountArea] = None
         
         # 组件工厂
         self.component_factory: Optional[Callable[[str, Dict[str, Any]], QWidget]] = None
@@ -48,7 +48,7 @@ class AbstractUIManager:
                 background_widget.lower()
         
         # 挂载区域管理器 - 在背景上方
-        self.mount_area_manager = MountArea(self.central_widget)
+        self.mount_area_manager = SimpleMountArea(self.central_widget)
         if self.component_factory:
             self.mount_area_manager.set_component_factory(self.component_factory)
         mount_area_widget = self.mount_area_manager.create_widget()

@@ -81,6 +81,7 @@ class UIConfig:
     custom_components: Dict[str, Any] = field(default_factory=lambda: {})
     grid_row_ratios: List[int] = field(default_factory=lambda: [1, 1, 1])  # 网格行高比例
     grid_col_ratios: List[int] = field(default_factory=lambda: [1, 1, 1])  # 网格列宽比例
+    menu_bar: Dict[str, Any] = field(default_factory=lambda: {})  # 菜单栏配置
     
     def __post_init__(self):
         """初始化九宫格挂载区域"""
@@ -94,6 +95,34 @@ class UIConfig:
                         visible=True,
                         position=(row, col)
                     )
+        
+        # 初始化默认菜单栏配置
+        if not self.menu_bar:
+            self.menu_bar = {
+                "file": {
+                    "title": "文件",
+                    "items": [
+                        {"id": "new", "text": "新建", "shortcut": "Ctrl+N", "enabled": True},
+                        {"id": "open", "text": "打开", "shortcut": "Ctrl+O", "enabled": True},
+                        {"id": "separator", "type": "separator"},
+                        {"id": "exit", "text": "退出", "shortcut": "Ctrl+Q", "enabled": True}
+                    ]
+                },
+                "edit": {
+                    "title": "编辑",
+                    "items": [
+                        {"id": "copy", "text": "复制", "shortcut": "Ctrl+C", "enabled": True},
+                        {"id": "paste", "text": "粘贴", "shortcut": "Ctrl+V", "enabled": True}
+                    ]
+                },
+                "view": {
+                    "title": "视图",
+                    "items": [
+                        {"id": "zoom_in", "text": "放大", "shortcut": "Ctrl++", "enabled": True},
+                        {"id": "zoom_out", "text": "缩小", "shortcut": "Ctrl+-", "enabled": True}
+                    ]
+                }
+            }
 
 
 class UIConfigManager:

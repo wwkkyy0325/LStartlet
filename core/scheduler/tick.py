@@ -14,7 +14,7 @@ from core.logger import info, warning, error, debug
 from core.event.events.scheduler_events import TickEvent
 from core.event.event_bus import EventBus
 # 依赖注入容器
-from core.di.app_container import get_app_container
+from core.di.app_container import get_app_container # type: ignore
 
 
 class TickState(Enum):
@@ -36,12 +36,13 @@ class TickConfig:
 class TickComponent:
     """Tick组件类"""
     
-    def __init__(self, config: Optional[TickConfig] = None):
+    def __init__(self, config: Optional[TickConfig] = None, event_bus: Optional[EventBus] = None):
         """
         初始化Tick组件
         
         Args:
             config: Tick配置，如果为None则使用默认配置
+            event_bus: 事件总线实例，如果为None则需要稍后设置
         """
         self.config = config or TickConfig()
         self._state = TickState.STOPPED
@@ -51,8 +52,7 @@ class TickComponent:
         self._tick_callbacks: List[Callable[[int, float], None]] = []
         self._async_tick_callbacks: List[Callable[[int, float], Awaitable[None]]] = []
         self._task: Optional[asyncio.Task[None]] = None
-        # 获取事件总线实例
-        self._event_bus = get_app_container().resolve(EventBus)
+        self._event_bus = event_bus
         # 移除标准logging，使用项目日志管理器
     
     @property
@@ -71,6 +71,11 @@ class TickComponent:
         if self._state == TickState.STOPPED:
             return 0.0
         return time.time() - self._start_time
+    
+    @property
+    def has_event_bus(self) -> bool:
+        """检查是否已设置事件总线"""
+        return self._event_bus is not None
     
     def add_tick_callback(self, callback: Callable[[int, float], None]) -> None:
         """
@@ -200,13 +205,14 @@ class TickComponent:
         # 记录tick时间
         self._last_tick_time = current_time
         
-        # 发布Tick事件
-        tick_data: Dict[str, Any] = {
-            "interval": self.config.interval,
-            "max_ticks": self.config.max_ticks,
-            "callback_count": len(self._tick_callbacks) + len(self._async_tick_callbacks)
-        }
-        self._event_bus.publish(TickEvent(self._current_tick, elapsed_time, tick_data))
+        # 发布Tick事件（如果事件总线可用）
+        if self._event_bus is not None:
+            tick_data: Dict[str, Any] = {
+                "interval": self.config.interval,
+                "max_ticks": self.config.max_ticks,
+                "callback_count": len(self._tick_callbacks) + len(self._async_tick_callbacks)
+            }
+            self._event_bus.publish(TickEvent(self._current_tick, elapsed_time, tick_data))
         
         if self.config.enable_logging:
             debug(f"Tick {self._current_tick} executed, elapsed={elapsed_time:.3f}s")
@@ -234,6 +240,10 @@ class TickComponent:
                 await asyncio.gather(*async_callbacks, return_exceptions=True)
             except Exception as e:
                 error(f"Error in async tick callbacks: {e}")
+    
+    def set_event_bus(self, event_bus: EventBus) -> None:
+        """设置事件总线实例"""
+        self._event_bus = event_bus
     
     def get_stats(self) -> Dict[str, Any]:
         """获取tick组件统计信息"""

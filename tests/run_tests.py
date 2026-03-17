@@ -1,49 +1,41 @@
-import unittest
+#!/usr/bin/env python3
+"""
+测试运行器
+使用unittest自动发现并运行所有测试用例
+"""
+
 import sys
 import os
-
-# 添加项目根目录到Python路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import unittest
 
 
-def create_test_suite():
-    """创建测试套件"""
+def run_all_tests():
+    """运行所有测试"""
+    # 获取项目根目录
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    test_dir = os.path.join(project_root, 'tests')
+    
+    # 添加项目根目录到Python路径
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
+    # 创建测试加载器
     loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
     
-    # 核心模块测试（排除有问题的调度器测试）
-    suite.addTests(loader.loadTestsFromName('tests.test_config'))
-    suite.addTests(loader.loadTestsFromName('tests.test_error'))
-    suite.addTests(loader.loadTestsFromName('tests.test_logger'))
-    suite.addTests(loader.loadTestsFromName('tests.test_path'))
-    # suite.addTests(loader.loadTestsFromName('tests.test_scheduler'))  # 移除有问题的调度器测试
+    # 自动发现所有测试
+    suite = loader.discover(
+        start_dir='tests',
+        pattern="test_*.py"
+    )
     
-    # UI模块测试（排除有问题的事件总线测试）
-    suite.addTests(loader.loadTestsFromName('tests.test_ui_components'))
-    # suite.addTests(loader.loadTestsFromName('tests.test_event_bus'))  # 移除有问题的事件总线测试
-    suite.addTests(loader.loadTestsFromName('tests.test_ui_events'))
-    suite.addTests(loader.loadTestsFromName('tests.test_ui_state'))
-    
-    # 命令系统测试
-    suite.addTests(loader.loadTestsFromName('tests.test_command_system'))
-    
-    # 新增的依赖注入和线程安全调度器测试
-    suite.addTests(loader.loadTestsFromName('tests.test_di_container'))
-    suite.addTests(loader.loadTestsFromName('tests.test_simple_thread_scheduler'))
-    
-    # 插件系统测试
-    suite.addTests(loader.loadTestsFromName('tests.test_plugin_loader'))
-    suite.addTests(loader.loadTestsFromName('tests.test_plugin_manager'))
-    suite.addTests(loader.loadTestsFromName('tests.test_plugin_dependency_manager'))
-    
-    return suite
-
-
-if __name__ == '__main__':
+    # 运行测试
     runner = unittest.TextTestRunner(verbosity=2)
-    suite = create_test_suite()
     result = runner.run(suite)
     
-    # 如果有失败的测试，退出码为1
-    if not result.wasSuccessful():
-        sys.exit(1)
+    # 返回测试结果
+    return result.wasSuccessful()
+
+
+if __name__ == "__main__":
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

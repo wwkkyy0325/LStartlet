@@ -7,8 +7,8 @@ from typing import Optional, Dict, Any, Callable, cast
 from pathlib import Path
 
 from PySide6.QtWidgets import QPushButton, QWidget
-from PySide6.QtGui import QPixmap, QPainter, QColor, QPen, QPaintEvent, QMouseEvent
-from PySide6.QtCore import Qt, QPoint, QEvent, QObject
+from PySide6.QtGui import QPixmap, QPainter, QColor, QPen, QPaintEvent, QMouseEvent, QBrush, QRadialGradient, QImage
+from PySide6.QtCore import Qt, QPoint, QEvent, QObject, QRect, QPropertyAnimation, QEasingCurve, Property
 
 from core.event.event_bus import EventBus
 from core.logger import info, debug
@@ -56,106 +56,87 @@ class StyledButton(QPushButton):
         self._click_callback: Optional[Callable[[], None]] = click_callback
         self._button_id: str = button_id or f"button_{id(self)}"
         
-        # 按下状态跟踪
-        self._pressed: bool = False
-        self._press_pos: QPoint = QPoint()
+        # 按钮状态标志
+        self._is_hovered: bool = False
+        self._is_pressed: bool = False
         
-        # 应用默认样式
-        self._apply_default_style()
+        # 发光动画相关
+        self._glow_radius: float = 0.0
+        self._target_glow_radius: float = 0.0
+        self._glow_animation: Optional[QPropertyAnimation] = None
         
-        # 如果提供了样式配置，应用自定义样式
-        if self._style_config:
-            self.apply_style(self._style_config)
-        
-        # 安装事件过滤器以拦截鼠标事件
-        self.installEventFilter(self)
+        # 应用初始样式
+        if self._original_style_config:
+            self.apply_style(self._original_style_config)
+        else:
+            self._apply_default_style()
         
         # 连接信号
         self.clicked.connect(self._on_button_clicked)
+        
+        # 启用鼠标追踪
+        self.setMouseTracking(True)
     
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        """事件过滤器，处理鼠标按下/释放事件"""
-        try:
-            if event.type() == QEvent.Type.MouseButtonPress:
-                self._pressed = True
-                # 将事件转换为鼠标事件以获取位置
-                if isinstance(event, QMouseEvent):
-                    self._press_pos = event.pos()
-                self._update_pressed_style(True)
-                return False  # 继续传递事件
-            
-            elif event.type() == QEvent.Type.MouseButtonRelease:
-                if self._pressed:
-                    # 检查是否在按钮范围内释放
-                    if isinstance(event, QMouseEvent):
-                        if self.rect().contains(event.pos()):
-                            self._update_pressed_style(False)
-                            self._pressed = False
-                            # 执行点击逻辑
-                            self.clicked.emit()
-                        else:
-                            # 在按钮外释放，不触发点击
-                            self._update_pressed_style(False)
-                            self._pressed = False
-                return False
-            
-            elif event.type() == QEvent.Type.Leave:
-                # 鼠标离开按钮区域
-                if self._pressed:
-                    self._update_pressed_style(False)
-                    self._pressed = False
-                return False
-            
-            return super().eventFilter(obj, event)
-            
-        except Exception as e:
-            from core.error import handle_error
-            handle_error(e)
-            return False
+    def enterEvent(self, event: QEvent) -> None:
+        """鼠标进入事件"""
+        self._is_hovered = True
+        # 启动发光动画 - 扩展到全按钮
+        max_radius = max(self.width(), self.height()) * 0.7
+        self._start_glow_animation(max_radius)
+        super().enterEvent(event)
     
-    def _update_pressed_style(self, pressed: bool) -> None:
-        """更新按钮按下状态的样式"""
+    def leaveEvent(self, event: QEvent) -> None:
+        """鼠标离开事件"""
+        self._is_hovered = False
+        self._is_pressed = False
+        # 启动发光动画 - 收缩到0
+        self._start_glow_animation(0.0)
+        super().leaveEvent(event)
+    
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """鼠标按下事件"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_pressed = True
+            self._update_button_style()
+        super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """鼠标释放事件"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_pressed = False
+            self._update_button_style()
+        super().mouseReleaseEvent(event)
+    
+    def _update_button_style(self) -> None:
+        """根据当前状态更新按钮样式"""
         if not self._original_style_config:
             return
+            
+        # 使用原始配置重新应用样式
+        self.apply_style(self._original_style_config)
+    
+    def get_glow_radius(self) -> float:
+        """获取当前发光半径"""
+        return self._glow_radius
+    
+    def set_glow_radius(self, radius: float) -> None:
+        """设置发光半径并触发重绘"""
+        self._glow_radius = radius
+        self.update()
+    
+    glow_radius = Property(float, get_glow_radius, set_glow_radius)
+    
+    def _start_glow_animation(self, target_radius: float) -> None:
+        """启动发光动画"""
+        if self._glow_animation is not None:
+            self._glow_animation.stop()
         
-        # 获取原始背景色（始终从原始配置读取）
-        base_color: str = self._original_style_config.get('background_color', '#4A90E2')
-        
-        if pressed:
-            # 按下状态 - 颜色变深
-            pressed_color: str = self._darken_color(base_color, 20)
-            new_style: Dict[str, Any] = {
-                'background_color': pressed_color,
-                'border_radius': self._original_style_config.get('border_radius', 8),
-                'text_color': self._original_style_config.get('text_color', '#FFFFFF'),
-                'font_size': self._original_style_config.get('font_size', 14)
-            }
-            
-            # 保留边框设置
-            if self._original_style_config.get('border_width', 1) > 0:
-                new_style['border_width'] = self._original_style_config.get('border_width', 1)
-                new_style['border_color'] = self._original_style_config.get('border_color', '#357ABD')
-            
-            self.apply_style(new_style)
-        else:
-            # 恢复原始样式 - 使用完整原始配置
-            restored_style: Dict[str, Any] = {
-                'width': self._original_style_config.get('width', self.width()),
-                'height': self._original_style_config.get('height', self.height()),
-                'border_radius': self._original_style_config.get('border_radius', 8),
-                'background_color': base_color,
-                'text_color': self._original_style_config.get('text_color', '#FFFFFF'),
-                'border_color': self._original_style_config.get('border_color', '#357ABD'),
-                'border_width': self._original_style_config.get('border_width', 1),
-                'font_size': self._original_style_config.get('font_size', 14),
-                'shape': self._original_style_config.get('shape', 'rounded')
-            }
-            
-            # 如果有悬停颜色，也恢复
-            if 'hover_background_color' in self._original_style_config:
-                restored_style['hover_background_color'] = self._original_style_config['hover_background_color']
-            
-            self.apply_style(restored_style)
+        self._glow_animation = QPropertyAnimation(self, b"glow_radius")
+        self._glow_animation.setDuration(300)  # 300ms 动画时长
+        self._glow_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._glow_animation.setStartValue(self._glow_radius)
+        self._glow_animation.setEndValue(target_radius)
+        self._glow_animation.start()
     
     def _darken_color(self, color_str: str, amount: int) -> str:
         """将颜色变暗指定数值"""
@@ -175,6 +156,34 @@ class StyledButton(QPushButton):
         except Exception:
             # 如果解析失败，返回原色
             return color_str
+    
+    def _lighten_color(self, color_str: str, amount: int) -> str:
+        """将颜色变亮指定数值"""
+        try:
+            # 解析颜色
+            color = QColor(color_str)
+            
+            # 调整亮度 - 使用 cast 解决 PySide6 类型推断问题
+            hslf = cast(tuple[float, float, float, float], color.getHslF())
+            h, s, l, a = hslf
+            new_l = min(1.0, l + (amount / 100.0))
+            
+            # 创建新颜色
+            new_color = QColor.fromHslF(h, s, new_l, a)
+            
+            return new_color.name()
+        except Exception:
+            # 如果解析失败，返回原色
+            return color_str
+    
+    def _hex_to_rgba(self, hex_color: str, alpha: float = 1.0) -> str:
+        """将十六进制颜色转换为RGBA元组字符串"""
+        try:
+            color = QColor(hex_color)
+            r, g, b, _ = color.getRgb()
+            return f"({r}, {g}, {b}, {alpha})"
+        except Exception:
+            return "(255, 255, 255, 1.0)"
     
     def _on_button_clicked(self) -> None:
         """处理按钮点击事件"""
@@ -258,9 +267,12 @@ class StyledButton(QPushButton):
                 - border_color: 边框颜色
                 - border_width: 边框宽度
                 - font_size: 字体大小
-                - opacity: 透明度 (0.0-1.0)
-                - background_image: 背景图片路径
-                - shape: 按钮形状 ('rectangle', 'circle', 'rounded')
+                - glow_effect_enabled: 是否启用悬浮发光效果
+                - glow_color: 发光颜色
+                - glow_opacity: 发光透明度 (0.0-1.0)
+                - hover_background_color: 悬停背景颜色
+                - hover_border_color: 悬停边框颜色
+                - pressed_background_color: 按下背景颜色
         """
         self._style_config.update(style_config)
         
@@ -270,97 +282,104 @@ class StyledButton(QPushButton):
             height = style_config.get('height', self.height())
             self.setFixedSize(width, height)
         
-        # 构建基础样式表
-        stylesheet = ""
-        
-        # 背景色（仅当没有图片背景时）
-        if 'background_image' not in style_config:
-            bg_color = style_config.get('background_color', '#4A90E2')
-            stylesheet += f"background-color: {bg_color};"
-        else:
-            # 图片背景使用透明背景
-            stylesheet += "background-color: transparent;"
-        
-        # 文本颜色
-        text_color = style_config.get('text_color', '#FFFFFF')
-        stylesheet += f"color: {text_color};"
-        
-        # 字体
-        font_size = style_config.get('font_size', 14)
-        stylesheet += f"font-size: {font_size}px;"
-        
-        # 边框
-        border_width = style_config.get('border_width', 1)
-        border_color = style_config.get('border_color', '#357ABD')
-        stylesheet += f"border: {border_width}px solid {border_color};"
-        
-        # 圆角
-        shape = style_config.get('shape', 'rounded')
-        if shape == 'circle':
-            radius = min(self.width(), self.height()) // 2
-            stylesheet += f"border-radius: {radius}px;"
-        elif shape == 'rounded' or 'border_radius' in style_config:
-            border_radius = style_config.get('border_radius', 8)
-            stylesheet += f"border-radius: {border_radius}px;"
-        else:  # rectangle
-            stylesheet += "border-radius: 0px;"
-        
-        # 设置基础样式
-        self.setStyleSheet(stylesheet)
-        
-        # 处理背景图片
-        if 'background_image' in style_config:
-            image_path = style_config['background_image']
-            if isinstance(image_path, str) and Path(image_path).exists():
-                self._background_image = QPixmap(image_path)
-            else:
-                self._background_image = None
-        else:
-            self._background_image = None
+        # 触发重绘
+        self.update()
     
     def paintEvent(self, event: QPaintEvent) -> None:
-        """重写绘制事件以支持图片背景"""
-        if self._background_image is not None:
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            
-            # 获取按钮矩形区域
-            rect = self.rect()
-            
-            # 绘制裁切后的背景图片
-            scaled_pixmap = self._background_image.scaled(
-                rect.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            painter.drawPixmap(rect, scaled_pixmap)
-            
-            # 绘制边框（如果需要）
-            if self._style_config.get('border_width', 0) > 0:
-                border_color = QColor(self._style_config.get('border_color', '#357ABD'))
-                pen = QPen(border_color, self._style_config.get('border_width', 1))
-                painter.setPen(pen)
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                
-                shape = self._style_config.get('shape', 'rounded')
-                if shape == 'circle':
-                    radius = min(rect.width(), rect.height()) // 2
-                    center = rect.center()
-                    painter.drawEllipse(center, radius, radius)
-                elif shape == 'rounded':
-                    border_radius = self._style_config.get('border_radius', 8)
-                    painter.drawRoundedRect(rect, border_radius, border_radius)
-                else:  # rectangle
-                    painter.drawRect(rect)
-            
-            # 绘制文本
-            if self.text():
-                text_color = QColor(self._style_config.get('text_color', '#FFFFFF'))
-                painter.setPen(text_color)
-                painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        """重写绘制事件以支持高级视觉效果"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        
+        rect = self.rect()
+        border_radius = self._style_config.get('border_radius', 8)
+        
+        # 获取当前状态的颜色配置
+        base_bg_color = QColor(self._style_config.get('background_color', '#4A90E2'))
+        if self._is_pressed:
+            bg_color_str = self._style_config.get('pressed_background_color', self._darken_color(base_bg_color.name(), 20))
+            bg_color = QColor(bg_color_str)
+        elif self._is_hovered:
+            bg_color_str = self._style_config.get('hover_background_color', self._lighten_color(base_bg_color.name(), 20))
+            bg_color = QColor(bg_color_str)
         else:
-            # 使用默认绘制
-            super().paintEvent(event)
+            bg_color = base_bg_color
+        
+        # 绘制圆角背景
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(bg_color)
+        painter.drawRoundedRect(rect, border_radius, border_radius)
+        
+        # 绘制边框
+        border_width = self._style_config.get('border_width', 1)
+        if border_width > 0:
+            border_color = QColor(self._style_config.get('border_color', '#357ABD'))
+            if self._is_hovered and 'hover_border_color' in self._style_config:
+                border_color = QColor(self._style_config['hover_border_color'])
+            
+            pen = QPen(border_color, border_width)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRoundedRect(rect, border_radius, border_radius)
+        
+        # 绘制悬浮发光效果（使用动画控制的半径）
+        if self._glow_radius > 0:
+            self._draw_glow_effect(painter, rect, border_radius)
+        
+        # 绘制文本
+        text_color = QColor(self._style_config.get('text_color', '#FFFFFF'))
+        painter.setPen(text_color)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        
+        font_size = self._style_config.get('font_size', 14)
+        font = painter.font()
+        font.setPointSize(font_size)
+        painter.setFont(font)
+        
+        text_rect = rect.adjusted(border_width, border_width, -border_width, -border_width)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self.text())
+    
+    def _draw_glow_effect(self, painter: QPainter, rect: QRect, border_radius: int) -> None:
+        """绘制悬浮发光效果 - 使用与按钮完全相同的圆角形状"""
+        if self._glow_radius <= 0:
+            return
+            
+        # 创建径向渐变
+        center_x = rect.center().x()
+        center_y = rect.center().y()
+        
+        glow_color = QColor(self._style_config.get('glow_color', '#FFFFFF'))
+        glow_opacity = self._style_config.get('glow_opacity', 0.6)
+        glow_color.setAlphaF(glow_opacity)
+        
+        # 使用动画控制的发光半径
+        gradient = QRadialGradient(center_x, center_y, self._glow_radius)
+        gradient.setColorAt(0, glow_color)
+        gradient.setColorAt(1, QColor(255, 255, 255, 0))
+        
+        # 绘制发光效果 - 使用与按钮相同的圆角比例
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(gradient)
+        
+        # 计算发光区域的尺寸和位置
+        glow_expand = int(self._glow_radius)
+        glow_rect = rect.adjusted(-glow_expand, -glow_expand, glow_expand, glow_expand)
+        
+        # 计算发光区域的圆角半径 - 保持与原始按钮相同的比例
+        original_short_side = min(rect.width(), rect.height())
+        glow_short_side = min(glow_rect.width(), glow_rect.height())
+        
+        if original_short_side > 0:
+            radius_ratio = glow_short_side / original_short_side
+            glow_border_radius = max(1, int(border_radius * radius_ratio))
+        else:
+            glow_border_radius = border_radius
+        
+        # 确保圆角半径不超过发光区域的一半
+        max_radius = min(glow_rect.width(), glow_rect.height()) // 2
+        glow_border_radius = min(glow_border_radius, max_radius)
+        
+        painter.drawRoundedRect(glow_rect, glow_border_radius, glow_border_radius)
     
     def get_current_style(self) -> Dict[str, Any]:
         """获取当前按钮样式配置"""
@@ -407,7 +426,8 @@ class ButtonStyles:
             'border_color': '#357ABD',
             'border_width': 1,
             'font_size': 14,
-            'hover_background_color': '#357ABD'
+            'hover_background_color': '#357ABD',
+            'pressed_background_color': '#2C5AA0'
         }
     
     @staticmethod
@@ -422,7 +442,8 @@ class ButtonStyles:
             'border_color': '#CCCCCC',
             'border_width': 1,
             'font_size': 14,
-            'hover_background_color': '#E0E0E0'
+            'hover_background_color': '#E0E0E0',
+            'pressed_background_color': '#D0D0D0'
         }
     
     @staticmethod
@@ -437,7 +458,8 @@ class ButtonStyles:
             'border_color': '#C0392B',
             'border_width': 1,
             'font_size': 14,
-            'hover_background_color': '#C0392B'
+            'hover_background_color': '#C0392B',
+            'pressed_background_color': '#962D1F'
         }
     
     @staticmethod
@@ -452,7 +474,34 @@ class ButtonStyles:
             'border_color': '#219653',
             'border_width': 1,
             'font_size': 14,
-            'hover_background_color': '#219653'
+            'hover_background_color': '#219653',
+            'pressed_background_color': '#1D8348'
+        }
+    
+    @staticmethod
+    def frosted_glass() -> Dict[str, Any]:
+        """透明玻璃样式按钮 - 白色半透明背景，带匀速发光动画效果"""
+        return {
+            'width': 120,
+            'height': 40,
+            'border_radius': 12,
+            # 白色半透明背景
+            'background_color': 'rgba(255, 255, 255, 40)',
+            # 靓丽文字颜色
+            'text_color': '#E0E0FF',
+            # 白边描边
+            'border_color': 'rgba(255, 255, 255, 120)',
+            'border_width': 1,
+            'font_size': 14,
+            # 悬停状态
+            'hover_background_color': 'rgba(255, 255, 255, 80)',
+            'hover_border_color': 'rgba(255, 255, 255, 200)',
+            # 按下状态
+            'pressed_background_color': 'rgba(255, 255, 255, 20)',
+            # 悬浮发光效果
+            'glow_effect_enabled': True,
+            'glow_color': '#FFFFFF',
+            'glow_opacity': 0.6
         }
     
     @staticmethod
@@ -466,7 +515,9 @@ class ButtonStyles:
             'text_color': '#FFFFFF',
             'border_color': '#357ABD',
             'border_width': 1,
-            'font_size': 16
+            'font_size': 16,
+            'hover_background_color': '#357ABD',
+            'pressed_background_color': '#2C5AA0'
         }
     
     @staticmethod
@@ -498,7 +549,7 @@ def create_styled_button(
     Args:
         text: 按钮文本
         parent: 父窗口部件
-        style_name: 预定义样式名称 ('primary', 'secondary', 'danger', 'success', 'circle')
+        style_name: 预定义样式名称 ('primary', 'secondary', 'danger', 'success', 'circle', 'frosted_glass')
         custom_style: 自定义样式配置
         event_bus: 事件总线实例
         click_callback: 点击回调函数
@@ -513,7 +564,8 @@ def create_styled_button(
             'secondary': ButtonStyles.secondary,
             'danger': ButtonStyles.danger,
             'success': ButtonStyles.success,
-            'circle': lambda: ButtonStyles.circle_icon()
+            'circle': lambda: ButtonStyles.circle_icon(),
+            'frosted_glass': ButtonStyles.frosted_glass
         }
         if style_name in style_map:
             style_config = style_map[style_name]()

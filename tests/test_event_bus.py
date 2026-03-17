@@ -339,6 +339,8 @@ class TestEventBus(unittest.TestCase):
     
     def test_get_all_subscribed_types(self):
         """测试获取所有已订阅的事件类型"""
+        # 确保开始时没有订阅者
+        self.bus.clear_all_subscriptions()
         self.assertEqual(len(self.bus.get_all_subscribed_types()), 0)
         
         handler = Mock(spec=LambdaEventHandler)

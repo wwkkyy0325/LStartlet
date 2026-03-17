@@ -14,7 +14,13 @@ from logging import warning
 import os
 import sys
 import time
-from typing import cast
+from typing import cast, Optional
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QPushButton, QMenuBar, QMenu, QFileDialog, QMessageBox,
+    QStackedWidget, QFrame, QScrollArea
+)
+from PySide6.QtGui import QAction
 
 # 核心模块导入
 from core.config.config_manager import ConfigManager
@@ -24,9 +30,9 @@ from core.error import handle_error, register_global_error_handler  # 添加regi
 from core.path import get_project_root, join_paths
 from core.event.event_bus import EventBus
 from core.event.events.ui_events import RenderProcessReadyEvent
-from core.event.events.scheduler_events import ApplicationLifecycleEvent, ProcessStartedEvent
+from core.event.events.scheduler_events import ApplicationLifecycleEvent
 from core.scheduler.tick import TickComponent, TickConfig
-from ui.ui_factory import UIFactory  # 添加tick相关导入
+from ui.factories.ui_factory_interface import IUIFactory  # 使用新的UI工厂接口
 
 # 新增模块导入
 from plugin import initialize_plugin_system
@@ -34,13 +40,14 @@ from core.persistence import initialize_persistence_system
 
 # 依赖注入容器（延迟导入）
 from core.di import ServiceContainer, ServiceLifetime
+from core.di.app_container import get_app_container
 
 
 class MainApplication:
     """主应用程序类"""
     
     def __init__(self):
-        self.container: ServiceContainer = ServiceContainer()  # 初始化为实际实例，避免None
+        self.container: ServiceContainer = get_app_container()  # 使用全局应用容器
         self.config_manager = None
         self.event_bus = None
         self.render_process_ready = False
@@ -50,6 +57,7 @@ class MainApplication:
         self.tick_component = None  # 添加tick组件引用
         self.plugin_manager = None  # 插件管理器
         self.persistence_manager = None  # 持久化管理器
+        self.ui_factory: Optional[IUIFactory] = None  # 使用新的UI工厂接口
         
     def initialize(self) -> bool:
         """初始化应用程序"""
@@ -73,65 +81,37 @@ class MainApplication:
             
             info("开始初始化OCR主应用程序...")
             
-            # 1. 初始化依赖注入容器
-            if not self._initialize_di_container():
-                error("依赖注入容器初始化失败")
-                return False
-            
-            # 2. 初始化持久化系统
+            # 1. 初始化持久化系统
             if not self._initialize_persistence_system():
                 error("持久化系统初始化失败")
                 return False
             
-            # 3. 检查并初始化配置文件
+            # 2. 检查并初始化配置文件
             if not self._initialize_config():
                 error("配置初始化失败")
                 return False
             
-            # 4. 获取事件总线实例（从DI容器）
+            # 3. 获取事件总线实例（从DI容器）
             self.event_bus = self.container.resolve(EventBus)
             
-            # 5. 初始化20Hz的tick系统 (每50ms一个tick)
+            # 4. 初始化20Hz的tick系统 (每50ms一个tick)
             if not self._initialize_tick_system():
                 error("Tick系统初始化失败")
                 return False
             
-            # 6. 初始化插件系统
+            # 5. 初始化插件系统
             if not self._initialize_plugin_system():
                 error("插件系统初始化失败")
                 return False
             
-            # 7. 注册核心工具和组件
-            if not self._register_core_components():
-                error("核心组件注册失败")
-                return False
-            
-            # 8. 初始化UI工厂（在核心组件注册完成后）
-            assert self.event_bus is not None
-            assert self.tick_component is not None
-            self.ui_factory = UIFactory()
-            self.ui_factory.register_event_listeners()
+            # 6. 初始化UI工厂（从DI容器获取）
+            self.ui_factory = self.container.resolve(IUIFactory)
             
             info("主应用程序初始化完成")
             return True
             
         except Exception as e:
             error(f"应用程序初始化异常: {e}")
-            handle_error(e)
-            return False
-    
-    def _initialize_di_container(self) -> bool:
-        """初始化依赖注入容器"""
-        try:
-            # 容器已经在__init__中初始化，这里只需要注册服务
-            self.container.register(ConfigManager, lifetime=ServiceLifetime.SINGLETON)
-            self.container.register(EventBus, lifetime=ServiceLifetime.SINGLETON)
-            
-            info("依赖注入容器初始化完成")
-            return True
-            
-        except Exception as e:
-            error(f"依赖注入容器初始化失败: {e}")
             handle_error(e)
             return False
     
@@ -171,10 +151,8 @@ class MainApplication:
             
             self.tick_component = TickComponent(tick_config)
             
-            # 将 TickComponent 注册到全局容器中
-            from core.di.app_container import get_app_container
-            global_container = get_app_container()
-            global_container.register(TickComponent, instance=self.tick_component, lifetime=ServiceLifetime.SINGLETON)
+            # 将 TickComponent 注册到容器中
+            self.container.register(TickComponent, instance=self.tick_component, lifetime=ServiceLifetime.SINGLETON)
             
             info("20Hz Tick系统初始化完成")
             return True
@@ -229,40 +207,6 @@ class MainApplication:
             handle_error(e)
             return False
     
-    def _register_core_components(self) -> bool:
-        """注册核心组件"""
-        try:
-            # 注册事件监听器
-            self._register_event_listeners()
-            
-            # 发布应用程序启动事件
-            app_start_event = ApplicationLifecycleEvent("starting")
-            assert self.event_bus is not None
-            self.event_bus.publish(app_start_event)
-            
-            # 主进程已经在GlobalProcessManager初始化时自动注册
-            main_pid = os.getpid()
-            info(f"主进程PID: {main_pid}")
-            
-            # 发布主进程启动事件
-            main_process_event = ProcessStartedEvent(
-                process_id=main_pid, 
-                process_data={"process_type": "main", "pid": main_pid}
-            )
-            self.event_bus.publish(main_process_event)
-            
-            # 发布应用程序已启动事件
-            app_started_event = ApplicationLifecycleEvent("started")
-            self.event_bus.publish(app_started_event)
-            
-            info("核心组件注册完成")
-            return True
-            
-        except Exception as e:
-            error(f"核心组件注册失败: {e}")
-            handle_error(e)
-            return False
-    
     def _register_event_listeners(self) -> None:
         """注册事件监听器"""
         try:
@@ -306,7 +250,14 @@ class MainApplication:
         """启动渲染进程"""
         try:
             assert self.ui_factory is not None
-            return self.ui_factory.start_render_process(timeout)
+            
+            # 创建Qt应用程序
+            self.qt_app = self.ui_factory.create_qt_application(sys.argv)
+            
+            # 创建默认UI（磨砂玻璃效果）
+            self._create_default_ui()
+            
+            return True
             
         except Exception as e:
             error(f"启动渲染进程失败: {e}")
@@ -344,6 +295,45 @@ class MainApplication:
             # 强制使用 UI工厂类创建磨砂玻璃窗口
             window = self.ui_factory.create_frosted_glass_ui()
             info(f"磨砂玻璃 UI 创建成功：{window}")
+            
+            # 创建简单的文件菜单
+            if hasattr(window, 'create_simple_file_menu'):
+                window.create_simple_file_menu()
+                info("简单文件菜单创建成功")
+            
+            # 挂载左侧栏组件到左侧专用区域
+            from ui.components import SidebarWidget, CentralContentManager
+            sidebar = SidebarWidget()
+            
+            # 将侧边栏设置为左侧区域的子组件
+            if hasattr(window, '_left_sidebar_area') and window._left_sidebar_area:
+                # 检查是否已有布局
+                existing_layout = window._left_sidebar_area.layout()
+                if existing_layout is None:
+                    layout = QVBoxLayout()
+                    layout.setContentsMargins(0, 0, 0, 0)
+                    window._left_sidebar_area.setLayout(layout)
+                else:
+                    layout = existing_layout
+                layout.addWidget(sidebar)
+                window._left_sidebar_area.show()  # 显示左侧区域
+                info("左侧栏组件挂载到左侧专用区域成功")
+            
+            # 创建中央内容管理器并挂载到中央挂载区域
+            central_manager = CentralContentManager()
+            central_manager.create_default_contents()
+            
+            # 挂载到中央挂载区域
+            if hasattr(window, '_mount_area') and window._mount_area:
+                success = window._mount_area.mount_component(central_manager)
+                if success:
+                    info("中央内容管理器挂载成功")
+                else:
+                    error("中央内容管理器挂载失败")
+            
+            # 建立信号连接：侧边栏的选择事件连接到中央内容管理器的显示/隐藏方法
+            sidebar.view_selected.connect(central_manager.show_content)
+            sidebar.view_deselected.connect(central_manager.hide_content)
             
         except Exception as e:
             error(f"磨砂玻璃 UI 创建失败，程序退出：{e}")
