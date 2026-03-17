@@ -5,7 +5,7 @@
 
 from typing import Optional, Callable, Dict, Any
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QApplication, QSizePolicy, QSplitter
 )
 from PySide6.QtCore import Qt, QPoint, QRect, QSize, QEvent
 from PySide6.QtGui import QCloseEvent, QMouseEvent, QEnterEvent, QPaintEvent, QCursor
@@ -109,6 +109,97 @@ class FrostedGlassWindow(QWidget):
         
         title_layout.addStretch()
         
+        # 面板管理按钮 - 每个挂载区一个按钮
+        self._panel_buttons = {}
+        
+        # 左侧挂载区按钮
+        left_btn = QLabel("◀")
+        left_btn.setObjectName("leftPanelButton")
+        left_btn.setStyleSheet("""
+            QLabel#leftPanelButton {
+                color: white;
+                font-size: 14px;
+                width: 24px;
+                height: 24px;
+                padding: 3px;
+                border-radius: 4px;
+                text-align: center;
+                background-color: rgba(255, 255, 255, 20);
+            }
+            QLabel#leftPanelButton:hover {
+                background-color: rgba(255, 255, 255, 40);
+            }
+        """)
+        left_btn.mousePressEvent = lambda event: self._toggle_left_mount_area()
+        title_layout.addWidget(left_btn)
+        self._panel_buttons['left'] = left_btn
+        
+        # 中央上挂载区按钮
+        top_btn = QLabel("▲")
+        top_btn.setObjectName("topPanelButton")
+        top_btn.setStyleSheet("""
+            QLabel#topPanelButton {
+                color: white;
+                font-size: 14px;
+                width: 24px;
+                height: 24px;
+                padding: 3px;
+                border-radius: 4px;
+                text-align: center;
+                background-color: rgba(255, 255, 255, 20);
+            }
+            QLabel#topPanelButton:hover {
+                background-color: rgba(255, 255, 255, 40);
+            }
+        """)
+        top_btn.mousePressEvent = lambda event: self._toggle_central_top_mount_area()
+        title_layout.addWidget(top_btn)
+        self._panel_buttons['top'] = top_btn
+        
+        # 中央下挂载区按钮（通常保持显示，但提供控制）
+        bottom_btn = QLabel("▼")
+        bottom_btn.setObjectName("bottomPanelButton")
+        bottom_btn.setStyleSheet("""
+            QLabel#bottomPanelButton {
+                color: white;
+                font-size: 14px;
+                width: 24px;
+                height: 24px;
+                padding: 3px;
+                border-radius: 4px;
+                text-align: center;
+                background-color: rgba(255, 255, 255, 20);
+            }
+            QLabel#bottomPanelButton:hover {
+                background-color: rgba(255, 255, 255, 40);
+            }
+        """)
+        bottom_btn.mousePressEvent = lambda event: self._toggle_central_bottom_mount_area()
+        title_layout.addWidget(bottom_btn)
+        self._panel_buttons['bottom'] = bottom_btn
+        
+        # 右侧挂载区按钮
+        right_btn = QLabel("▶")
+        right_btn.setObjectName("rightPanelButton")
+        right_btn.setStyleSheet("""
+            QLabel#rightPanelButton {
+                color: white;
+                font-size: 14px;
+                width: 24px;
+                height: 24px;
+                padding: 3px;
+                border-radius: 4px;
+                text-align: center;
+                background-color: rgba(255, 255, 255, 20);
+            }
+            QLabel#rightPanelButton:hover {
+                background-color: rgba(255, 255, 255, 40);
+            }
+        """)
+        right_btn.mousePressEvent = lambda event: self._toggle_right_mount_area()
+        title_layout.addWidget(right_btn)
+        self._panel_buttons['right'] = right_btn
+        
         # 最小化按钮
         min_btn = QLabel("─")
         min_btn.setObjectName("minButton")
@@ -133,31 +224,67 @@ class FrostedGlassWindow(QWidget):
         self._top_menu_bar = None  # 初始化为None，按需创建
         
         # === 重构内容区域布局 ===
-        # 使用水平布局支持左侧侧边栏、中央内容区、右侧区域
-        content_layout = QHBoxLayout()
-        content_layout.setContentsMargins(10, 0, 10, 10)  # 左右保留边距，上下无边距
-        content_layout.setSpacing(0)
+        # 使用水平分割器支持：左侧菜单栏、左侧挂载区、中央内容区、右侧区域
+        content_splitter = QSplitter(Qt.Orientation.Horizontal)
+        content_splitter.setContentsMargins(0, 0, 0, 0)
+        content_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: rgba(255, 255, 255, 30);
+                width: 2px;
+            }
+        """)
         
-        # 左侧侧边栏区域（专用区域，固定宽度50px）
-        self._left_sidebar_area = QWidget()
-        self._left_sidebar_area.setObjectName("leftSidebarArea")
-        self._left_sidebar_area.setFixedWidth(50)
-        self._left_sidebar_area.hide()  # 初始隐藏，按需显示
-        content_layout.addWidget(self._left_sidebar_area)
+        # 左侧菜单栏区域（顶天立地，固定宽度50px，专门用于菜单）
+        self._left_menu_area = QWidget()
+        self._left_menu_area.setObjectName("leftMenuArea")
+        self._left_menu_area.setFixedWidth(50)
+        self._left_menu_area.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        content_splitter.addWidget(self._left_menu_area)
         
-        # 中央内容区域 - 使用简化挂载区域
-        self._mount_area = SimpleMountAreaWidget()
-        self._mount_area.setObjectName("contentWidget")
-        content_layout.addWidget(self._mount_area)
+        # 左侧挂载区域（顶天立地，可调整大小，用于其他组件如资源管理器）
+        self._left_mount_area = QWidget()
+        self._left_mount_area.setObjectName("leftMountArea")
+        self._left_mount_area.setMinimumWidth(200)  # 最小宽度200px
+        self._left_mount_area.setMaximumWidth(500)  # 最大宽度500px
+        self._left_mount_area.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self._left_mount_area.hide()  # 初始隐藏，按需显示
+        content_splitter.addWidget(self._left_mount_area)
         
-        # 右侧区域（专用区域，初始隐藏）
-        self._right_area = QWidget()
-        self._right_area.setObjectName("rightArea")
-        self._right_area.setFixedWidth(300)  # 默认宽度300px
-        self._right_area.hide()  # 初始隐藏，按需显示
-        content_layout.addWidget(self._right_area)
+        # 中央内容区域 - 分为上下两个独立的挂载区
+        central_vertical_splitter = QSplitter(Qt.Orientation.Vertical)
+        central_vertical_splitter.setContentsMargins(0, 0, 0, 0)
+        central_vertical_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: rgba(255, 255, 255, 30);
+                height: 2px;
+            }
+        """)
         
-        main_layout.addLayout(content_layout)
+        # 上挂载区
+        self._central_top_mount_area = QWidget()
+        self._central_top_mount_area.setObjectName("centralTopMountArea")
+        self._central_top_mount_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        central_vertical_splitter.addWidget(self._central_top_mount_area)
+        
+        # 下挂载区
+        self._central_bottom_mount_area = QWidget()
+        self._central_bottom_mount_area.setObjectName("centralBottomMountArea")
+        self._central_bottom_mount_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        central_vertical_splitter.addWidget(self._central_bottom_mount_area)
+        
+        content_splitter.addWidget(central_vertical_splitter)
+        
+        # 右侧挂载区域（顶天立地，可调整大小）
+        self._right_mount_area = QWidget()
+        self._right_mount_area.setObjectName("rightMountArea")
+        self._right_mount_area.setMinimumWidth(200)  # 最小宽度200px
+        self._right_mount_area.setMaximumWidth(500)  # 最大宽度500px
+        self._right_mount_area.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self._right_mount_area.hide()  # 初始隐藏，按需显示
+        content_splitter.addWidget(self._right_mount_area)
+        
+        # 设置默认分割比例
+        main_layout.addWidget(content_splitter)
         # === 布局重构完成 ===
         
         # 设置主布局 - 容器完全填满窗口
@@ -166,9 +293,9 @@ class FrostedGlassWindow(QWidget):
         layout.setSpacing(0)
         layout.addWidget(main_container)
 
-    def mount_to_right_area(self, widget: QWidget) -> bool:
+    def mount_to_right_mount_area(self, widget: QWidget) -> bool:
         """
-        将组件挂载到右侧专用区域
+        将组件挂载到右侧挂载区域
         
         Args:
             widget: 要挂载的组件
@@ -177,9 +304,9 @@ class FrostedGlassWindow(QWidget):
             bool: 是否成功挂载
         """
         try:
-            if not hasattr(self, '_right_area') or self._right_area is None:
+            if not hasattr(self, '_right_mount_area') or self._right_mount_area is None:
                 from core.logger import error
-                error("右侧区域未初始化，无法挂载组件")
+                error("右侧挂载区域未初始化，无法挂载组件")
                 return False
                 
             if not isinstance(widget, QWidget):
@@ -187,26 +314,106 @@ class FrostedGlassWindow(QWidget):
                 error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
                 return False
             
-            # 清空右侧区域的现有内容
-            for child in self._right_area.findChildren(QWidget):
+            # 清空右侧挂载区域的现有内容
+            for child in self._right_mount_area.findChildren(QWidget):
                 child.setParent(None)
             
-            # 设置组件父级并添加到右侧区域
-            widget.setParent(self._right_area)
-            layout = QVBoxLayout(self._right_area)
+            # 设置组件父级并添加到右侧挂载区域
+            widget.setParent(self._right_mount_area)
+            layout = QVBoxLayout(self._right_mount_area)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(widget)
             
-            # 显示右侧区域
-            self._right_area.show()
+            # 显示右侧挂载区域
+            self._right_mount_area.show()
             
             from core.logger import info
-            info(f"组件挂载到右侧区域成功: {widget.__class__.__name__}")
+            info("组件挂载到右侧挂载区域成功")
             return True
             
         except Exception as e:
             from core.logger import error
-            error(f"挂载到右侧区域失败: {e}")
+            error(f"挂载到右侧挂载区域失败: {e}")
+            return False
+    
+    def mount_to_central_top_mount_area(self, widget: QWidget) -> bool:
+        """
+        将组件挂载到中央上挂载区域
+        
+        Args:
+            widget: 要挂载的组件
+            
+        Returns:
+            bool: 是否成功挂载
+        """
+        try:
+            if not hasattr(self, '_central_top_mount_area') or self._central_top_mount_area is None:
+                from core.logger import error
+                error("中央上挂载区域未初始化，无法挂载组件")
+                return False
+                
+            if not isinstance(widget, QWidget):
+                from core.logger import error
+                error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
+                return False
+            
+            # 清空中央上挂载区域的现有内容
+            for child in self._central_top_mount_area.findChildren(QWidget):
+                child.setParent(None)
+            
+            # 设置组件父级并添加到中央上挂载区域
+            widget.setParent(self._central_top_mount_area)
+            layout = QVBoxLayout(self._central_top_mount_area)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(widget)
+            
+            from core.logger import info
+            info("组件挂载到中央上挂载区域成功")
+            return True
+            
+        except Exception as e:
+            from core.logger import error
+            error(f"挂载到中央上挂载区域失败: {e}")
+            return False
+    
+    def mount_to_central_bottom_mount_area(self, widget: QWidget) -> bool:
+        """
+        将组件挂载到中央下挂载区域
+        
+        Args:
+            widget: 要挂载的组件
+            
+        Returns:
+            bool: 是否成功挂载
+        """
+        try:
+            if not hasattr(self, '_central_bottom_mount_area') or self._central_bottom_mount_area is None:
+                from core.logger import error
+                error("中央下挂载区域未初始化，无法挂载组件")
+                return False
+                
+            if not isinstance(widget, QWidget):
+                from core.logger import error
+                error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
+                return False
+            
+            # 清空中央下挂载区域的现有内容
+            for child in self._central_bottom_mount_area.findChildren(QWidget):
+                child.setParent(None)
+            
+            # 设置组件父级并添加到中央下挂载区域
+            widget.setParent(self._central_bottom_mount_area)
+            layout = QVBoxLayout(self._central_bottom_mount_area)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(widget)
+            
+            from core.logger import info
+            info("组件挂载到中央下挂载区域成功")
+            return True
+            
+        except Exception as e:
+            from core.logger import error
+            error(f"挂载到中央下挂载区域失败: {e}")
             return False
 
     def unmount_right_area(self) -> None:
@@ -794,3 +1001,283 @@ class FrostedGlassWindow(QWidget):
         
         # 使用层级管理器显示模态对话框
         self._hierarchy_manager.show_modal_dialog(settings_dialog, "settings")
+
+    def mount_to_central_content(self, widget: QWidget) -> bool:
+        """
+        将组件挂载到中央内容区域
+        
+        Args:
+            widget: 要挂载的组件
+            
+        Returns:
+            bool: 是否成功挂载
+        """
+        try:
+            if not hasattr(self, '_central_content_manager') or self._central_content_manager is None:
+                from core.logger import error
+                error("中央内容管理器未初始化，无法挂载组件")
+                return False
+                
+            if not isinstance(widget, QWidget):
+                from core.logger import error
+                error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
+                return False
+            
+            # 假设widget是一个CentralContentManagerV2实例
+            if hasattr(widget, 'create_default_contents'):
+                widget.create_default_contents()
+            
+            return True
+            
+        except Exception as e:
+            from core.logger import error
+            error(f"挂载到中央内容区域失败: {e}")
+            return False
+
+    def mount_to_left_mount_area(self, widget: QWidget) -> bool:
+        """
+        将组件挂载到左侧挂载区域（用于资源管理器等组件）
+        
+        Args:
+            widget: 要挂载的组件
+            
+        Returns:
+            bool: 是否成功挂载
+        """
+        try:
+            if not hasattr(self, '_left_mount_area') or self._left_mount_area is None:
+                from core.logger import error
+                error("左侧挂载区域未初始化，无法挂载组件")
+                return False
+                
+            if not isinstance(widget, QWidget):
+                from core.logger import error
+                error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
+                return False
+            
+            # 清空左侧挂载区域的现有内容
+            for child in self._left_mount_area.findChildren(QWidget):
+                child.setParent(None)
+            
+            # 设置组件父级并添加到左侧挂载区域
+            widget.setParent(self._left_mount_area)
+            layout = QVBoxLayout(self._left_mount_area)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(widget)
+            
+            # 显示左侧挂载区域
+            self._left_mount_area.show()
+            
+            from core.logger import info
+            info("组件挂载到左侧挂载区域成功")
+            return True
+            
+        except Exception as e:
+            from core.logger import error
+            error(f"挂载到左侧挂载区域失败: {e}")
+            return False
+
+    def mount_to_right_mount_area(self, widget: QWidget) -> bool:
+        """
+        将组件挂载到右侧挂载区域
+        
+        Args:
+            widget: 要挂载的组件
+            
+        Returns:
+            bool: 是否成功挂载
+        """
+        try:
+            if not hasattr(self, '_right_mount_area') or self._right_mount_area is None:
+                from core.logger import error
+                error("右侧挂载区域未初始化，无法挂载组件")
+                return False
+                
+            if not isinstance(widget, QWidget):
+                from core.logger import error
+                error(f"挂载组件失败: 组件必须是QWidget实例，当前类型: {type(widget)}")
+                return False
+            
+            # 清空右侧挂载区域的现有内容
+            for child in self._right_mount_area.findChildren(QWidget):
+                child.setParent(None)
+            
+            # 设置组件父级并添加到右侧挂载区域
+            widget.setParent(self._right_mount_area)
+            layout = QVBoxLayout(self._right_mount_area)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(widget)
+            
+            # 显示右侧挂载区域
+            self._right_mount_area.show()
+            
+            from core.logger import info
+            info("组件挂载到右侧挂载区域成功")
+            return True
+            
+        except Exception as e:
+            from core.logger import error
+            error(f"挂载到右侧挂载区域失败: {e}")
+            return False
+
+    def _toggle_left_mount_area(self):
+        """切换左侧挂载区显示/隐藏"""
+        if hasattr(self, '_left_mount_area') and self._left_mount_area:
+            if self._left_mount_area.isVisible():
+                self._left_mount_area.hide()
+                # 更新按钮样式表示隐藏状态
+                if 'left' in self._panel_buttons:
+                    self._panel_buttons['left'].setStyleSheet("""
+                        QLabel#leftPanelButton {
+                            color: #888888;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(136, 136, 136, 20);
+                        }
+                        QLabel#leftPanelButton:hover {
+                            background-color: rgba(136, 136, 136, 40);
+                        }
+                    """)
+            else:
+                self._left_mount_area.show()
+                # 恢复正常样式
+                if 'left' in self._panel_buttons:
+                    self._panel_buttons['left'].setStyleSheet("""
+                        QLabel#leftPanelButton {
+                            color: white;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(255, 255, 255, 20);
+                        }
+                        QLabel#leftPanelButton:hover {
+                            background-color: rgba(255, 255, 255, 40);
+                        }
+                    """)
+
+    def _toggle_central_top_mount_area(self):
+        """切换中央上挂载区显示/隐藏"""
+        if hasattr(self, '_central_top_mount_area') and self._central_top_mount_area:
+            if self._central_top_mount_area.isVisible():
+                self._central_top_mount_area.hide()
+                if 'top' in self._panel_buttons:
+                    self._panel_buttons['top'].setStyleSheet("""
+                        QLabel#topPanelButton {
+                            color: #888888;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(136, 136, 136, 20);
+                        }
+                        QLabel#topPanelButton:hover {
+                            background-color: rgba(136, 136, 136, 40);
+                        }
+                    """)
+            else:
+                self._central_top_mount_area.show()
+                if 'top' in self._panel_buttons:
+                    self._panel_buttons['top'].setStyleSheet("""
+                        QLabel#topPanelButton {
+                            color: white;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(255, 255, 255, 20);
+                        }
+                        QLabel#topPanelButton:hover {
+                            background-color: rgba(255, 255, 255, 40);
+                        }
+                    """)
+
+    def _toggle_central_bottom_mount_area(self):
+        """切换中央下挂载区显示/隐藏"""
+        if hasattr(self, '_central_bottom_mount_area') and self._central_bottom_mount_area:
+            if self._central_bottom_mount_area.isVisible():
+                self._central_bottom_mount_area.hide()
+                if 'bottom' in self._panel_buttons:
+                    self._panel_buttons['bottom'].setStyleSheet("""
+                        QLabel#bottomPanelButton {
+                            color: #888888;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(136, 136, 136, 20);
+                        }
+                        QLabel#bottomPanelButton:hover {
+                            background-color: rgba(136, 136, 136, 40);
+                        }
+                    """)
+            else:
+                self._central_bottom_mount_area.show()
+                if 'bottom' in self._panel_buttons:
+                    self._panel_buttons['bottom'].setStyleSheet("""
+                        QLabel#bottomPanelButton {
+                            color: white;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(255, 255, 255, 20);
+                        }
+                        QLabel#bottomPanelButton:hover {
+                            background-color: rgba(255, 255, 255, 40);
+                        }
+                    """)
+
+    def _toggle_right_mount_area(self):
+        """切换右侧挂载区显示/隐藏"""
+        if hasattr(self, '_right_mount_area') and self._right_mount_area:
+            if self._right_mount_area.isVisible():
+                self._right_mount_area.hide()
+                if 'right' in self._panel_buttons:
+                    self._panel_buttons['right'].setStyleSheet("""
+                        QLabel#rightPanelButton {
+                            color: #888888;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(136, 136, 136, 20);
+                        }
+                        QLabel#rightPanelButton:hover {
+                            background-color: rgba(136, 136, 136, 40);
+                        }
+                    """)
+            else:
+                self._right_mount_area.show()
+                if 'right' in self._panel_buttons:
+                    self._panel_buttons['right'].setStyleSheet("""
+                        QLabel#rightPanelButton {
+                            color: white;
+                            font-size: 14px;
+                            width: 24px;
+                            height: 24px;
+                            padding: 3px;
+                            border-radius: 4px;
+                            text-align: center;
+                            background-color: rgba(255, 255, 255, 20);
+                        }
+                        QLabel#rightPanelButton:hover {
+                            background-color: rgba(255, 255, 255, 40);
+                        }
+                    """)

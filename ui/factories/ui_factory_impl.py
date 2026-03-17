@@ -6,8 +6,8 @@ UI工厂实现模块
 import sys
 from typing import Optional, Dict, Any, Callable, List
 
-from PySide6.QtWidgets import QApplication, QWidget
-
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt
 from core.logger import info, error
 from core.event.event_bus import EventBus
 from core.scheduler.tick import TickComponent
@@ -175,6 +175,9 @@ class UIFactoryImpl(IUIFactory):
                 if hasattr(mount_area_manager, 'set_component_factory'):
                     mount_area_manager.set_component_factory(self._create_component_wrapper)
             
+            # 创建示例UI内容
+            self._create_example_ui_content(window)
+            
             self.current_ui = window
             window.show()
             
@@ -193,6 +196,213 @@ class UIFactoryImpl(IUIFactory):
         except Exception as e:
             error(f"磨砂玻璃UI创建失败：{e}")
             raise
+    
+    def _create_example_ui_content(self, window: FrostedGlassWindow):
+        """创建示例UI内容"""
+        try:
+            # 创建左侧菜单栏内容
+            self._create_left_menu_content(window)
+            
+            # 创建左侧挂载区内容（资源管理器）
+            from ui.components.directory_viewer import DirectoryViewerComponent
+            directory_viewer = DirectoryViewerComponent()
+            directory_widget = directory_viewer.create_widget()
+            window.mount_to_left_mount_area(directory_widget)
+            
+            # 创建中央上挂载区内容（搜索面板）
+            self._create_central_top_content(window)
+            
+            # 创建中央下挂载区内容（图片查看器）
+            from ui.components.image_viewer import ImageViewerComponent
+            image_viewer = ImageViewerComponent()
+            image_widget = image_viewer.create_widget()
+            window.mount_to_central_bottom_mount_area(image_widget)
+            
+            # 创建右侧挂载区内容（属性面板）
+            self._create_right_panel_content(window)
+            
+            # 建立组件间的信号连接
+            self._setup_component_connections(window, directory_widget, image_widget)
+            
+            info("示例UI内容创建成功")
+            
+        except Exception as e:
+            error(f"创建示例UI内容失败: {e}")
+    
+    def _create_central_top_content(self, window: FrostedGlassWindow):
+        """创建中央上挂载区内容"""
+        try:
+            top_content = QWidget()
+            top_layout = QVBoxLayout(top_content)
+            top_layout.setContentsMargins(20, 20, 20, 20)
+            top_layout.setSpacing(10)
+            
+            # 标题
+            title_label = QLabel("🔍 搜索")
+            title_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
+            top_layout.addWidget(title_label)
+            
+            # 搜索功能描述
+            search_desc = QLabel("""
+- 全局搜索
+- 文件搜索  
+- 符号搜索
+- OCR文本搜索
+            """)
+            search_desc.setStyleSheet("color: white; font-size: 12px;")
+            top_layout.addWidget(search_desc)
+            
+            top_layout.addStretch()
+            
+            # 挂载到中央上挂载区
+            window.mount_to_central_top_mount_area(top_content)
+            
+        except Exception as e:
+            error(f"创建中央上挂载区内容失败: {e}")
+    
+    def _setup_component_connections(self, window: FrostedGlassWindow, directory_widget, image_widget):
+        """建立组件间的信号连接"""
+        try:
+            # 连接目录查看器的点击事件到图片查看器
+            if hasattr(directory_widget, '_tree_widget'):
+                directory_widget._tree_widget.itemClicked.connect(
+                    lambda item, column: self._on_directory_item_clicked(item, image_widget)
+                )
+            
+        except Exception as e:
+            error(f"建立组件连接失败: {e}")
+    
+    def _on_directory_item_clicked(self, item, image_widget):
+        """处理目录项点击事件"""
+        try:
+            from PySide6.QtCore import Qt
+            from pathlib import Path
+            
+            # 获取点击的文件路径
+            path_str = item.data(0, Qt.ItemDataRole.UserRole)
+            if not path_str:
+                return
+                
+            path = Path(path_str)
+            
+            # 检查是否是支持的文件类型（图片或PDF）
+            if path.is_file():
+                suffix = path.suffix.lower()
+                if suffix in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.pdf'}:
+                    # 显示点击的文件
+                    image_widget.set_image(str(path))
+                else:
+                    # 如果不是支持的文件类型，清空图片查看器
+                    if hasattr(image_widget, 'clear'):
+                        image_widget.clear()
+            else:
+                # 如果是目录，清空图片查看器
+                if hasattr(image_widget, 'clear'):
+                    image_widget.clear()
+                    
+        except Exception as e:
+            pass  # 静默处理错误
+    
+    def _create_left_menu_content(self, window: FrostedGlassWindow):
+        """创建左侧菜单栏内容"""
+        try:
+            # 在左侧菜单栏区域添加菜单按钮
+            left_menu_layout = QVBoxLayout(window._left_menu_area)
+            left_menu_layout.setContentsMargins(0, 10, 0, 10)
+            left_menu_layout.setSpacing(10)
+            
+            # 资源管理器按钮
+            explorer_btn = QLabel("📁")
+            explorer_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            explorer_btn.setStyleSheet("""
+                QLabel {
+                    color: white;
+                    font-size: 16px;
+                    padding: 8px;
+                    border-radius: 4px;
+                    background-color: rgba(255, 255, 255, 20);
+                }
+                QLabel:hover {
+                    background-color: rgba(255, 255, 255, 40);
+                }
+            """)
+            left_menu_layout.addWidget(explorer_btn)
+            
+            # 搜索按钮
+            search_btn = QLabel("🔍")
+            search_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            search_btn.setStyleSheet("""
+                QLabel {
+                    color: white;
+                    font-size: 16px;
+                    padding: 8px;
+                    border-radius: 4px;
+                    background-color: rgba(255, 255, 255, 20);
+                }
+                QLabel:hover {
+                    background-color: rgba(255, 255, 255, 40);
+                }
+            """)
+            left_menu_layout.addWidget(search_btn)
+            
+            # 扩展按钮
+            extensions_btn = QLabel("🧩")
+            extensions_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            extensions_btn.setStyleSheet("""
+                QLabel {
+                    color: white;
+                    font-size: 16px;
+                    padding: 8px;
+                    border-radius: 4px;
+                    background-color: rgba(255, 255, 255, 20);
+                }
+                QLabel:hover {
+                    background-color: rgba(255, 255, 255, 40);
+                }
+            """)
+            left_menu_layout.addWidget(extensions_btn)
+            
+            left_menu_layout.addStretch()
+            
+        except Exception as e:
+            error(f"创建左侧菜单内容失败: {e}")
+    
+    def _create_right_panel_content(self, window: FrostedGlassWindow):
+        """创建右侧面板内容"""
+        try:
+            right_panel = QWidget()
+            right_layout = QVBoxLayout(right_panel)
+            right_layout.setContentsMargins(10, 10, 10, 10)
+            right_layout.setSpacing(10)
+            
+            # 标题
+            title_label = QLabel("属性面板")
+            title_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
+            right_layout.addWidget(title_label)
+            
+            # 属性列表
+            properties_text = QLabel("""
+文件信息:
+- 类型: 图片
+- 尺寸: 1920x1080
+- 大小: 2.3 MB
+- 修改时间: 2026-03-17
+
+OCR结果:
+- 置信度: 95%
+- 识别文字: 128字
+- 语言: 中文
+            """)
+            properties_text.setStyleSheet("color: white; font-size: 12px;")
+            right_layout.addWidget(properties_text)
+            
+            right_layout.addStretch()
+            
+            # 挂载到右侧区域
+            window.mount_to_right_mount_area(right_panel)
+            
+        except Exception as e:
+            error(f"创建右侧面板内容失败: {e}")
     
     def _create_component_wrapper(self, component_type: str, config: Optional[Dict[str, Any]] = None) -> QWidget:
         """组件工厂包装函数，适配AbstractUIManager的接口"""

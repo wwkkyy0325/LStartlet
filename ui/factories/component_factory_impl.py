@@ -11,6 +11,7 @@ from ui.components import (
     SimpleMountAreaWidget, SimpleMountArea, TopMenuBar,
     DirectoryViewerComponent, ImageViewerComponent
 )
+from ui.components.central_content_manager_v2 import CentralContentManagerV2
 from .component_factory_interface import IComponentFactory
 
 
@@ -28,7 +29,8 @@ class ComponentFactoryImpl(IComponentFactory):
             "frosted_glass_window": FrostedGlassWindow,
             "top_menu_bar": TopMenuBar,
             "directory_viewer": DirectoryViewerComponent,
-            "image_viewer": ImageViewerComponent
+            "image_viewer": ImageViewerComponent,
+            "central_content_manager_v2": CentralContentManagerV2
         }
         info("组件工厂初始化完成")
     
