@@ -5,8 +5,9 @@
 
 from typing import Dict, Any, Optional, Union, Callable
 from dataclasses import dataclass, field
-import json
+import yaml
 from pathlib import Path
+from typing import Union, Dict, Any
 
 
 @dataclass
@@ -57,10 +58,10 @@ class SchedulerConfig:
         return cls(**config_dict)
     
     @classmethod
-    def from_json_file(cls, file_path: Union[str, Path]) -> 'SchedulerConfig':
-        """从JSON文件加载配置"""
+    def from_yaml_file(cls, file_path: Union[str, Path]) -> 'SchedulerConfig':
+        """从YAML文件加载配置"""
         with open(file_path, 'r', encoding='utf-8') as f:
-            config_dict = json.load(f)
+            config_dict: Dict[str, Any] = yaml.safe_load(f) or {}
         return cls.from_dict(config_dict)
 
 
@@ -126,4 +127,4 @@ class ConfigManager:
     def save_to_file(self, file_path: Union[str, Path]) -> None:
         """保存配置到文件"""
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(self._config.to_dict(), f, indent=2, ensure_ascii=False)
+            yaml.dump(self._config.to_dict(), f, allow_unicode=True, indent=2, sort_keys=False)

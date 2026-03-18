@@ -7,6 +7,7 @@ from core.error import log_error, get_error_info
 from core.event import event_bus
 from .command_base import BaseCommand, CommandResult
 from .command_events import CommandExecutionEvent, CommandCompletedEvent, CommandFailedEvent
+from core.decorators import with_error_handling_async, with_logging_async
 
 
 class CommandExecutor:
@@ -16,6 +17,8 @@ class CommandExecutor:
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._active_commands: Dict[str, asyncio.Future[CommandResult]] = {}
         
+    @with_error_handling_async(error_code="COMMAND_EXECUTION_ERROR", default_return=None)
+    @with_logging_async(level="info", measure_time=True, include_args=True)
     async def execute_command(self, command: BaseCommand, **kwargs: Any) -> CommandResult:
         """
         异步执行命令

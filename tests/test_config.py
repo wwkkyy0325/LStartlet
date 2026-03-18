@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-配置管理器单元测试
+Configuration Manager Unit Tests
 """
 
 import os
@@ -75,10 +75,10 @@ class TestConfigManager(unittest.TestCase):
         self.assertFalse(success)
         
         # 测试数值验证
-        success: bool = set_config("ocr_confidence_threshold", 0.8)
+        success: bool = set_config("max_workers", 8)
         self.assertTrue(success)
         
-        success: bool = set_config("ocr_confidence_threshold", 1.5)  # 超出范围
+        success: bool = set_config("max_workers", -1)  # 无效值
         self.assertFalse(success)
     
     def test_get_all_configs(self):
@@ -95,7 +95,7 @@ class TestConfigManager(unittest.TestCase):
         set_config("debug_mode", True)
         
         # 保存配置到临时目录
-        temp_file = os.path.join(self.temp_dir, "test_config.json")
+        temp_file = os.path.join(self.temp_dir, "test_config.yaml")
         success = save_config(temp_file)
         self.assertTrue(success)
         

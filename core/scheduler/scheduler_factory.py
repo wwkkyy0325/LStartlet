@@ -80,5 +80,5 @@ class SchedulerFactory:
         Returns:
             调度器实例
         """
-        config = SchedulerConfig.from_json_file(file_path)
+        config = SchedulerConfig.from_yaml_file(file_path)
         return Scheduler(config)

@@ -40,13 +40,13 @@ class ConsoleHandler(BaseHandler):
             LogLevel.CRITICAL: '\033[35m', # 紫色
         }
         self._reset_color = '\033[0m'
-        # 中文日志级别映射
+        # 英文日志级别映射
         self._level_names = {
-            LogLevel.DEBUG: '调试',
-            LogLevel.INFO: '信息',
-            LogLevel.WARNING: '警告',
-            LogLevel.ERROR: '错误',
-            LogLevel.CRITICAL: '严重',
+            LogLevel.DEBUG: 'DEBUG',
+            LogLevel.INFO: 'INFO',
+            LogLevel.WARNING: 'WARNING',
+            LogLevel.ERROR: 'ERROR',
+            LogLevel.CRITICAL: 'CRITICAL',
         }
     
     def emit(self, record: LogRecord) -> None:
@@ -93,13 +93,13 @@ class RotatingFileHandler(BaseHandler):
         
         # 为不同进程类型创建不同的日志文件
         self.filename = self._get_process_specific_filename()
-        # 中文日志级别映射
+        # 英文日志级别映射
         self._level_names = {
-            LogLevel.DEBUG: '调试',
-            LogLevel.INFO: '信息',
-            LogLevel.WARNING: '警告',
-            LogLevel.ERROR: '错误',
-            LogLevel.CRITICAL: '严重',
+            LogLevel.DEBUG: 'DEBUG',
+            LogLevel.INFO: 'INFO',
+            LogLevel.WARNING: 'WARNING',
+            LogLevel.ERROR: 'ERROR',
+            LogLevel.CRITICAL: 'CRITICAL',
         }
         # 进程类型中文映射
         self._process_names = {

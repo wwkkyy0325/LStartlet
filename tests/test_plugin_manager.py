@@ -1,5 +1,5 @@
 """
-插件管理器测试
+Plugin Manager Tests
 """
 
 import os

@@ -6,7 +6,7 @@ from datetime import datetime
 from .level import LogRecord, LogLevel
 from .handler import BaseHandler, ConsoleHandler, RotatingFileHandler
 # 导入路径管理器
-from core.path import get_project_root
+from core.path import get_project_root # type: ignore
 
 
 class LoggerCore:
@@ -54,13 +54,26 @@ class LoggerCore:
         
         # 获取调用者信息 - 使用inspect.stack()替代私有API
         try:
-            # 获取调用栈，跳过当前方法和_log方法本身
+            # 获取调用栈
             stack = inspect.stack()
-            # stack[0] 是当前方法 (_log)
-            # stack[1] 是_log的调用者 (debug/info/warning等)
-            # stack[2] 是实际的业务代码调用者
-            if len(stack) >= 3:
-                caller_frame_info = stack[2]
+            # 需要跳过日志系统内部的调用栈帧
+            # 找到第一个不在core.logger包中的调用者
+            caller_frame_info = None
+            for frame_info in stack[1:]:  # 跳过当前方法
+                filename = frame_info.filename
+                # 检查是否是core.logger模块的文件
+                if 'core\\logger' not in filename and 'core/logger' not in filename:
+                    caller_frame_info = frame_info
+                    break
+            
+            if caller_frame_info is None:
+                # 如果找不到外部调用者，使用栈中的最后一个
+                if len(stack) >= 2:
+                    caller_frame_info = stack[-1]
+                else:
+                    caller_frame_info = stack[1] if len(stack) >= 2 else None
+            
+            if caller_frame_info:
                 filename = caller_frame_info.filename
                 module_name = self._get_module_name(filename)
                 function_name = caller_frame_info.function
@@ -96,16 +109,26 @@ class LoggerCore:
     def _get_module_name(self, filepath: str) -> str:
         """从文件路径获取模块名"""
         try:
-            path = filepath.replace('\\', '/').replace('/', '.')
-            if path.endswith('.py'):
-                path = path[:-3]
+            # 首先标准化路径分隔符
+            normalized_path = filepath.replace('\\', '/')
+            
             # 使用路径管理器获取项目根目录
+            from core.path import get_project_root
             project_root = get_project_root().replace('\\', '/')
             if not project_root.endswith('/'):
                 project_root += '/'
-            if path.startswith(project_root):
-                path = path[len(project_root):]
-            return path.lstrip('.')
+            
+            # 从完整路径中移除项目根目录
+            if normalized_path.startswith(project_root):
+                relative_path = normalized_path[len(project_root):]
+            else:
+                relative_path = normalized_path
+            
+            # 将路径转换为模块名格式（替换/为.，移除.py扩展名）
+            if relative_path.endswith('.py'):
+                relative_path = relative_path[:-3]
+            module_name = relative_path.replace('/', '.')
+            return module_name.lstrip('.')
         except Exception:
             return 'unknown'
     

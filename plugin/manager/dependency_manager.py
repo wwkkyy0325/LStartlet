@@ -3,13 +3,16 @@
 实现混合依赖管理模式：检查本地依赖→自动安装到专用目录→支持自包含包回退
 """
 
-import sys
+import yaml
 import subprocess
-import json
-from typing import Dict, Optional, Any
+import sys
 from pathlib import Path
-
+from typing import Dict, List, Optional, Tuple, Any # type: ignore
+# 使用项目自定义日志管理器
 from core.logger import info, warning, error
+# 使用项目自定义错误处理系统  
+from core.error import handle_error # type: ignore
+from plugin.exceptions.plugin_exceptions import PluginDependencyError # type: ignore
 
 
 class PluginDependencyManager:
@@ -40,7 +43,7 @@ class PluginDependencyManager:
         if not dependencies:
             return True
             
-        info(f"开始解析插件 {plugin_id} 的依赖...")
+        info(f"Starting to resolve dependencies for plugin {plugin_id}...")
         
         plugin_dep_dir = self.base_dir / plugin_id
         plugin_dep_dir.mkdir(exist_ok=True)
@@ -258,21 +261,21 @@ class PluginDependencyManager:
     
     def _load_installed_deps(self) -> Dict[str, str]:
         """加载已安装的依赖记录"""
-        deps_file = self.base_dir / "installed_deps.json"
+        deps_file = self.base_dir / "installed_deps.yaml"
         if deps_file.exists():
             try:
                 with open(deps_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    return yaml.safe_load(f) or {}
             except Exception as e:
                 warning(f"加载已安装依赖记录失败: {e}")
         return {}
     
     def _save_installed_deps(self):
         """保存已安装的依赖记录"""
-        deps_file = self.base_dir / "installed_deps.json"
+        deps_file = self.base_dir / "installed_deps.yaml"
         try:
             with open(deps_file, 'w', encoding='utf-8') as f:
-                json.dump(self.installed_deps, f, indent=2, ensure_ascii=False)
+                yaml.dump(self.installed_deps, f, allow_unicode=True, indent=2, sort_keys=False)
         except Exception as e:
             error(f"保存已安装依赖记录失败: {e}")
     

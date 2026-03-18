@@ -41,14 +41,14 @@ class PluginBase(ABC):
         
     @property
     def container(self) -> ServiceContainer:
-        """获取依赖注入容器"""
+        """Get dependency injection container"""
         if self._container is None:
-            raise RuntimeError(f"插件 {self.plugin_id} 的容器未设置")
+            raise RuntimeError(f"Plugin {self.plugin_id} container not set")
         return self._container
     
     @container.setter
     def container(self, container: ServiceContainer) -> None:
-        """设置依赖注入容器"""
+        """Set dependency injection container"""
         if self._is_initialized:
             raise RuntimeError(f"插件 {self.plugin_id} 已经初始化，不能重新设置容器")
         self._container = container

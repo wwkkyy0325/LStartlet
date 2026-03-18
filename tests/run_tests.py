@@ -13,7 +13,6 @@ def run_all_tests():
     """运行所有测试"""
     # 获取项目根目录
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    test_dir = os.path.join(project_root, 'tests')
     
     # 添加项目根目录到Python路径
     if project_root not in sys.path:

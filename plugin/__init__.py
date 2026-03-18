@@ -1,33 +1,37 @@
-"""
-插件系统初始化模块
-"""
+"""Plugin module exports"""
 
-from plugin.manager.plugin_manager import PluginManager
-from core.di import ServiceContainer
-from core.event.event_bus import EventBus
-from core.di.service_descriptor import ServiceLifetime
+# 延迟导入以避免循环依赖
+def _get_plugin_base():
+    from .base.plugin_base import PluginBase
+    return PluginBase
 
+def _get_iplugin():
+    from .base.plugin_interface import IPlugin
+    return IPlugin
 
-def initialize_plugin_system(container: ServiceContainer, event_bus: EventBus) -> PluginManager:
-    """
-    初始化插件系统
-    
-    Args:
-        container: 依赖注入容器
-        event_bus: 事件总线
-        
-    Returns:
-        插件管理器实例
-    """
-    from core.logger import info
-    
-    info("正在初始化插件系统...")
-    
-    # 创建插件管理器
-    plugin_manager = PluginManager(container, event_bus)
-    
-    # 注册到依赖注入容器
-    container.register(PluginManager, instance=plugin_manager, lifetime=ServiceLifetime.SINGLETON)
-    
-    info("插件系统初始化完成")
-    return plugin_manager
+def _get_iplugin_manager():
+    from .base.plugin_interface import IPluginManager
+    return IPluginManager
+
+def _get_plugin_manager():
+    from .manager.plugin_manager import PluginManager
+    return PluginManager
+
+# 插件系统核心类
+PluginBase = _get_plugin_base()
+IPlugin = _get_iplugin()
+IPluginManager = _get_iplugin_manager()
+PluginManager = _get_plugin_manager()
+
+# 插件装饰器
+from core.decorators import plugin_component, plugin_event_handler
+
+# 明确导出的符号
+__all__ = [
+    'PluginBase',
+    'IPlugin', 
+    'IPluginManager',
+    'PluginManager',
+    'plugin_component',
+    'plugin_event_handler'
+]

@@ -11,11 +11,8 @@ from plugin.base.plugin_base import PluginBase
 from plugin.base.plugin_interface import IPluginManager, IPlugin
 from plugin.manager.plugin_loader import PluginLoader
 from plugin.manager.dependency_manager import PluginDependencyManager
-from plugin.exceptions.plugin_exceptions import PluginLoadError, PluginInitializeError
-from plugin.events.plugin_events import (
-    PluginLoadedEvent, PluginUnloadedEvent, PluginInitializedEvent,
-    PluginStartedEvent, PluginStoppedEvent
-)
+from plugin.exceptions.plugin_exceptions import PluginLoadError
+from plugin.events.plugin_events import PluginLoadedEvent, PluginUnloadedEvent
 from core.di import ServiceContainer
 from core.event.event_bus import EventBus
 from core.logger import info, error, warning
@@ -55,24 +52,24 @@ class PluginManager(IPluginManager):
                 elif os.path.isdir(path):
                     self._load_plugins_from_directory(path)
                 else:
-                    warning(f"插件路径不存在或无效: {path}")
+                    warning(f"Plugin path does not exist or is invalid: {path}")
     
     def _load_plugin_from_file(self, plugin_file: str) -> None:
-        """从文件加载单个插件"""
+        """Load single plugin from file"""
         try:
             plugin_class = self._loader.load_plugin_from_file(plugin_file)
             if plugin_class is not None:
-                # 使用类名作为插件ID（更安全的方式）
+                # Use class name as plugin ID (safer approach)
                 plugin_id = plugin_class.__name__
                 
                 if plugin_id in self._plugin_classes:
-                    warning(f"插件 {plugin_id} 已经加载，跳过重复加载")
+                    warning(f"Plugin {plugin_id} already loaded, skipping duplicate load")
                     return
                 
                 self._plugin_classes[plugin_id] = plugin_class
-                info(f"成功加载插件类: {plugin_id}")
+                info(f"Successfully loaded plugin class: {plugin_id}")
                 
-                # 发布插件加载事件（使用类名作为名称）
+                # Publish plugin loaded event (use class name as name)
                 self._event_bus.publish(PluginLoadedEvent(
                     plugin_id=plugin_id,
                     plugin_name=plugin_id,
@@ -80,23 +77,23 @@ class PluginManager(IPluginManager):
                 ))
                 
         except PluginLoadError as e:
-            error(f"加载插件文件失败: {plugin_file}, 错误: {e}")
+            error(f"Failed to load plugin file: {plugin_file}, error: {e}")
         except Exception as e:
-            error(f"加载插件文件时发生未预期错误: {plugin_file}, 错误: {e}")
+            error(f"Unexpected error loading plugin file: {plugin_file}, error: {e}")
     
     def _load_plugins_from_directory(self, plugin_dir: str) -> None:
-        """从目录加载所有插件"""
+        """Load all plugins from directory"""
         try:
             plugin_classes = self._loader.load_plugin_from_directory(plugin_dir)
             for plugin_id, plugin_class in plugin_classes.items():
                 if plugin_id in self._plugin_classes:
-                    warning(f"插件 {plugin_id} 已经加载，跳过重复加载")
+                    warning(f"Plugin {plugin_id} already loaded, skipping duplicate load")
                     continue
                 
                 self._plugin_classes[plugin_id] = plugin_class
-                info(f"成功加载插件类: {plugin_id}")
+                info(f"Successfully loaded plugin class: {plugin_id}")
                 
-                # 发布插件加载事件
+                # Publish plugin loaded event
                 self._event_bus.publish(PluginLoadedEvent(
                     plugin_id=plugin_id,
                     plugin_name=plugin_id,
@@ -104,115 +101,97 @@ class PluginManager(IPluginManager):
                 ))
                 
         except Exception as e:
-            error(f"从目录加载插件失败: {plugin_dir}, 错误: {e}")
+            error(f"Failed to load plugins from directory: {plugin_dir}, error: {e}")
     
     def unload_plugin(self, plugin_id: str) -> bool:
         """
-        卸载插件
+        Unload plugin
         
         Args:
-            plugin_id: 插件ID
+            plugin_id: Plugin ID
             
         Returns:
-            卸载是否成功
+            Whether unload was successful
         """
         with self._lock:
             if plugin_id not in self._plugins:
-                warning(f"插件 {plugin_id} 未加载，无法卸载")
+                warning(f"Plugin {plugin_id} not loaded, cannot unload")
                 return False
             
             try:
                 plugin = self._plugins[plugin_id]
                 
-                # 如果插件正在运行，先停止它
+                # If plugin is running, stop it first
                 if plugin.is_started:
                     plugin.stop()
                 
-                # 清理插件
+                # Clean up plugin
                 plugin.cleanup()
                 
-                # 从管理器中移除
+                # Remove from manager
                 del self._plugins[plugin_id]
                 if plugin_id in self._plugin_classes:
                     del self._plugin_classes[plugin_id]
                 
-                # 发布插件卸载事件
+                # Publish plugin unloaded event
                 self._event_bus.publish(PluginUnloadedEvent(
                     plugin_id=plugin_id,
                     plugin_name=plugin.name
                 ))
                 
-                info(f"成功卸载插件: {plugin_id}")
+                info(f"Successfully unloaded plugin: {plugin_id}")
                 return True
                 
             except Exception as e:
-                error(f"卸载插件 {plugin_id} 失败: {e}")
+                error(f"Failed to unload plugin {plugin_id}: {e}")
                 return False
     
     def get_plugin(self, plugin_id: str) -> Optional[IPlugin]:
         """
-        获取指定插件
+        Get specified plugin
         
         Args:
-            plugin_id: 插件ID
+            plugin_id: Plugin ID
             
         Returns:
-            插件实例或 None
+            Plugin instance or None
         """
         return self._plugins.get(plugin_id)
     
     def get_all_plugins(self) -> List[IPlugin]:
-        """获取所有插件"""
+        """Get all plugins"""
         return list(self._plugins.values())
     
     def is_plugin_loaded(self, plugin_id: str) -> bool:
-        """检查插件是否已加载"""
+        """Check if plugin is loaded"""
         return plugin_id in self._plugins
     
     def initialize_all_plugins(self) -> bool:
         """
-        初始化所有插件
+        Initialize all plugins
         
         Returns:
-            所有插件是否初始化成功
+            Whether all plugins initialized successfully
         """
         if not self._is_initialized:
-            info("开始初始化所有插件...")
+            info("Starting initialization of all plugins...")
             self._is_initialized = True
         
+        # 如果没有插件类，直接返回True
+        if not self._plugin_classes:
+            return True
+            
         success = True
         with self._lock:
-            # 按依赖顺序初始化插件（简单实现：按加载顺序）
+            # 按加载顺序初始化插件
             for plugin_id, plugin_class in self._plugin_classes.items():
                 if plugin_id in self._plugins:
                     # 插件已经初始化
                     continue
                 
                 try:
-                    # 尝试从类属性获取依赖（支持静态声明）
-                    dependencies = {}
-                    if hasattr(plugin_class, 'PLUGIN_DEPENDENCIES'):
-                        dependencies = getattr(plugin_class, 'PLUGIN_DEPENDENCIES', {})
-                    else:
-                        # 如果没有静态声明，尝试创建临时实例获取依赖
-                        try:
-                            temp_plugin = plugin_class(plugin_id, plugin_id, "1.0.0")
-                            dependencies = temp_plugin.get_dependencies()
-                        except Exception as e:
-                            warning(f"无法获取插件 {plugin_id} 的依赖信息: {e}")
-                            dependencies = {}
-                    
-                    if not self._dependency_manager.resolve_dependencies(plugin_id, dependencies):
-                        warning(f"插件 {plugin_id} 的依赖解析失败，跳过初始化")
-                        success = False
-                        continue
-                    
                     # 创建插件实例
-                    plugin = self._create_plugin_instance(plugin_class, plugin_id)
-                    if plugin is None:
-                        error(f"创建插件实例失败: {plugin_id}")
-                        success = False
-                        continue
+                    plugin = plugin_class(plugin_id, plugin_id, "1.0.0")
                     
                     # 设置依赖注入容器
                     plugin.container = self._container
@@ -220,225 +199,114 @@ class PluginManager(IPluginManager):
                     # 初始化插件
                     if plugin.initialize():
                         self._plugins[plugin_id] = plugin
-                        info(f"插件 {plugin_id} 初始化成功")
-                        
-                        # 发布插件初始化事件
-                        self._event_bus.publish(PluginInitializedEvent(
-                            plugin_id=plugin_id,
-                            plugin_name=plugin.name,
-                            success=True
-                        ))
+                        info(f"Plugin {plugin_id} initialized successfully")
                     else:
-                        error(f"插件 {plugin_id} 初始化失败")
+                        error(f"Failed to initialize plugin: {plugin_id}")
                         success = False
                         
-                        # 发布插件初始化失败事件
-                        self._event_bus.publish(PluginInitializedEvent(
-                            plugin_id=plugin_id,
-                            plugin_name=plugin.name,
-                            success=False,
-                            error_message="初始化失败"
-                        ))
-                        
-                except PluginInitializeError as e:
-                    error(f"插件 {plugin_id} 初始化异常: {e}")
-                    success = False
-                    
-                    # 发布插件初始化失败事件
-                    self._event_bus.publish(PluginInitializedEvent(
-                        plugin_id=plugin_id,
-                        plugin_name=getattr(e, 'plugin_id', 'unknown'),
-                        success=False,
-                        error_message=str(e)
-                    ))
-                    
                 except Exception as e:
-                    error(f"插件 {plugin_id} 初始化时发生未预期错误: {e}")
+                    error(f"Exception during plugin initialization: {plugin_id}, error: {e}")
                     success = False
-                    
-                    # 发布插件初始化失败事件
-                    self._event_bus.publish(PluginInitializedEvent(
-                        plugin_id=plugin_id,
-                        plugin_name="unknown",
-                        success=False,
-                        error_message=f"未预期错误: {e}"
-                    ))
-        
-        if success:
-            info("所有插件初始化完成")
-        else:
-            warning("部分插件初始化失败")
             
-        return success
-    
-    def _create_plugin_instance(self, plugin_class: Type[PluginBase], plugin_id: str) -> Optional[PluginBase]:
-        """
-        创建插件实例
-        
-        Args:
-            plugin_class: 插件类
-            plugin_id: 插件ID
+            if success:
+                info("All plugins initialized successfully")
+            else:
+                warning("Some plugins failed to initialize")
             
-        Returns:
-            插件实例或 None
-        """
-        try:
-            # 尝试获取插件的元数据
-            name = getattr(plugin_class, 'PLUGIN_NAME', plugin_id)
-            version = getattr(plugin_class, 'PLUGIN_VERSION', '1.0.0')
-            description = getattr(plugin_class, 'PLUGIN_DESCRIPTION', '')
-            
-            # 使用插件元数据创建实例
-            plugin = plugin_class(plugin_id, name, version, description)
-            return plugin
-                
-        except Exception as e:
-            error(f"创建插件实例时发生错误: {e}")
-            return None
+            return success
     
     def start_all_plugins(self) -> bool:
         """
-        启动所有插件
+        Start all plugins
         
         Returns:
-            所有插件是否启动成功
+            Whether all plugins started successfully
         """
-        info("开始启动所有插件...")
+        if not self._is_initialized:
+            # 如果还没有初始化，先初始化
+            if not self.initialize_all_plugins():
+                return False
+        
         success = True
-        
         with self._lock:
-            for plugin in self._plugins.values():
-                try:
-                    if plugin.start():
-                        info(f"插件 {plugin.plugin_id} 启动成功")
-                        
-                        # 发布插件启动事件
-                        self._event_bus.publish(PluginStartedEvent(
-                            plugin_id=plugin.plugin_id,
-                            plugin_name=plugin.name,
-                            success=True
-                        ))
-                    else:
-                        error(f"插件 {plugin.plugin_id} 启动失败")
+            for plugin_id, plugin in self._plugins.items():
+                if not plugin.is_started:
+                    try:
+                        if plugin.start():
+                            info(f"Plugin {plugin_id} started successfully")
+                        else:
+                            error(f"Failed to start plugin: {plugin_id}")
+                            success = False
+                    except Exception as e:
+                        error(f"Exception during plugin start: {plugin_id}, error: {e}")
                         success = False
-                        
-                        # 发布插件启动失败事件
-                        self._event_bus.publish(PluginStartedEvent(
-                            plugin_id=plugin.plugin_id,
-                            plugin_name=plugin.name,
-                            success=False,
-                            error_message="启动失败"
-                        ))
-                        
-                except Exception as e:
-                    error(f"插件 {plugin.plugin_id} 启动时发生未预期错误: {e}")
-                    success = False
-                    
-                    # 发布插件启动失败事件
-                    self._event_bus.publish(PluginStartedEvent(
-                        plugin_id=plugin.plugin_id,
-                        plugin_name=plugin.name,
-                        success=False,
-                        error_message=f"未预期错误: {e}"
-                    ))
-        
-        if success:
-            info("所有插件启动完成")
-        else:
-            warning("部分插件启动失败")
             
-        return success
+            if success:
+                info("All plugins started successfully")
+            else:
+                warning("Some plugins failed to start")
+            
+            return success
     
     def stop_all_plugins(self) -> bool:
         """
-        停止所有插件
+        Stop all plugins
         
         Returns:
-            所有插件是否停止成功
+            Whether all plugins stopped successfully
         """
-        info("开始停止所有插件...")
         success = True
-        
         with self._lock:
-            # 反向停止插件（后启动的先停止）
-            for plugin in reversed(list(self._plugins.values())):
-                try:
-                    if plugin.stop():
-                        info(f"插件 {plugin.plugin_id} 停止成功")
-                        
-                        # 发布插件停止事件
-                        self._event_bus.publish(PluginStoppedEvent(
-                            plugin_id=plugin.plugin_id,
-                            plugin_name=plugin.name,
-                            success=True
-                        ))
-                    else:
-                        error(f"插件 {plugin.plugin_id} 停止失败")
+            for plugin_id, plugin in self._plugins.items():
+                if plugin.is_started:
+                    try:
+                        if plugin.stop():
+                            info(f"Plugin {plugin_id} stopped successfully")
+                        else:
+                            error(f"Failed to stop plugin: {plugin_id}")
+                            success = False
+                    except Exception as e:
+                        error(f"Exception during plugin stop: {plugin_id}, error: {e}")
                         success = False
-                        
-                        # 发布插件停止失败事件
-                        self._event_bus.publish(PluginStoppedEvent(
-                            plugin_id=plugin.plugin_id,
-                            plugin_name=plugin.name,
-                            success=False,
-                            error_message="停止失败"
-                        ))
-                        
-                except Exception as e:
-                    error(f"插件 {plugin.plugin_id} 停止时发生未预期错误: {e}")
-                    success = False
-                    
-                    # 发布插件停止失败事件
-                    self._event_bus.publish(PluginStoppedEvent(
-                        plugin_id=plugin.plugin_id,
-                        plugin_name=plugin.name,
-                        success=False,
-                        error_message=f"未预期错误: {e}"
-                    ))
-        
-        if success:
-            info("所有插件停止完成")
-        else:
-            warning("部分插件停止失败")
             
-        return success
-    
+            if success:
+                info("All plugins stopped successfully")
+            else:
+                warning("Some plugins failed to stop")
+            
+            return success
+        
     def cleanup_all_plugins(self) -> bool:
         """
-        清理所有插件
+        Cleanup all plugins
         
         Returns:
-            所有插件是否清理成功
+            Whether all plugins cleaned up successfully
         """
-        info("开始清理所有插件...")
+        if not self._plugins:
+            return True
+            
         success = True
-        
         with self._lock:
-            # 反向清理插件
-            for plugin in reversed(list(self._plugins.values())):
+            for plugin_id, plugin in self._plugins.items():
                 try:
                     if plugin.cleanup():
-                        info(f"插件 {plugin.plugin_id} 清理成功")
+                        info(f"Plugin {plugin_id} cleaned up successfully")
                     else:
-                        error(f"插件 {plugin.plugin_id} 清理失败")
+                        error(f"Plugin {plugin_id} failed to cleanup")
                         success = False
-                        
                 except Exception as e:
-                    error(f"插件 {plugin.plugin_id} 清理时发生未预期错误: {e}")
+                    error(f"Unexpected error cleaning up plugin {plugin_id}: {e}")
                     success = False
-        
-        # 清理插件依赖
-        for plugin_id in list(self._plugin_classes.keys()):
-            self._dependency_manager.cleanup_plugin_dependencies(plugin_id)
-        
+                    
         # 清空插件列表
         self._plugins.clear()
         self._plugin_classes.clear()
         self._is_initialized = False
         
         if success:
-            info("所有插件清理完成")
+            info("All plugins cleaned up successfully")
         else:
-            warning("部分插件清理失败")
+            warning("Some plugins failed to cleanup")
             
         return success

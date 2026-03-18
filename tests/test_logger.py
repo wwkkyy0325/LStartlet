@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-日志模块单元测试
-测试logger、handler、level等核心功能
+Logger Module Unit Tests
+Test core functionality of logger, handler, level, etc.
 """
 
 import os
@@ -135,7 +135,7 @@ class TestConsoleHandler(unittest.TestCase):
         )
         
         formatted = self.handler.format_record(record)
-        expected = "[2026-03-12 18:43:30] 信息     | test_module:test_function:42 | 测试消息"
+        expected = "[2026-03-12 18:43:30] INFO   | test_module:test_function:42 | 测试消息"
         self.assertEqual(formatted, expected)
 
 
@@ -186,7 +186,7 @@ class TestRotatingFileHandler(unittest.TestCase):
         with open(self.log_file, 'r', encoding='utf-8') as f:
             content = f.read().strip()
         
-        expected = "[2026-03-12 18:43:30.000] [主进程] 信息     | test_module:test_function:42 | 文件测试消息"
+        expected = "[2026-03-12 18:43:30.000] [主进程] INFO   | test_module:test_function:42 | 文件测试消息"
         self.assertEqual(content, expected)
 
 

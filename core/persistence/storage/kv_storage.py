@@ -3,10 +3,10 @@
 提供轻量级的键值对存储功能
 """
 
-import json
+import yaml
 import threading
-from typing import Dict, Any, Optional, List
 from pathlib import Path
+from typing import Any, Dict, Optional, List, cast
 from datetime import datetime
 
 from core.persistence.models.persistence_models import StorageItem, StorageConfig
@@ -70,19 +70,19 @@ class KVStorage:
         
         try:
             with open(self._storage_path, 'r', encoding='utf-8') as f:
-                raw_data = json.load(f)
+                raw_data = cast(Dict[str, Any], yaml.safe_load(f) or {})
             
             # 转换为 StorageItem 对象
             self._data = {}
             for key, item_data in raw_data.items():
-                created_at = datetime.fromisoformat(item_data['created_at'])
-                updated_at = datetime.fromisoformat(item_data['updated_at'])
+                created_at = datetime.fromisoformat(str(item_data['created_at']))
+                updated_at = datetime.fromisoformat(str(item_data['updated_at']))
                 self._data[key] = StorageItem(
-                    key=key,
+                    key=str(key),
                     value=item_data['value'],
                     created_at=created_at,
                     updated_at=updated_at,
-                    metadata=item_data.get('metadata', {})
+                    metadata=cast(Dict[str, Any], item_data.get('metadata', {}))
                 )
             
             debug(f"从文件加载了 {len(self._data)} 个存储项")
@@ -110,7 +110,7 @@ class KVStorage:
             # 写入临时文件，然后原子性地替换原文件
             temp_path = self._storage_path.with_suffix('.tmp')
             with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(save_data, f, ensure_ascii=False, indent=2)
+                yaml.dump(save_data, f, allow_unicode=True, indent=2, sort_keys=False)
             
             # 原子性替换
             temp_path.replace(self._storage_path)

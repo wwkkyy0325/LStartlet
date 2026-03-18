@@ -60,7 +60,7 @@ class TestErrorFormatter(unittest.TestCase):
         
         # OCR异常应该包含错误码
         self.assertIn("TEST_CODE", formatted)
-        self.assertIn("错误码", formatted)
+        self.assertIn("Error Code", formatted)
     
     def test_format_error_with_regular_exception(self):
         """测试普通异常的错误格式化"""

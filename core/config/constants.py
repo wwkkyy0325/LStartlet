@@ -5,7 +5,7 @@
 from typing import Dict, Any, Callable
 
 # 默认配置文件名
-DEFAULT_CONFIG_FILENAME = "config.json"
+DEFAULT_CONFIG_FILENAME = "config.yaml"
 
 # 配置类型枚举
 CONFIG_TYPES = {
@@ -33,16 +33,14 @@ SYSTEM_DEFAULT_CONFIGS: Dict[str, Any] = {
     "temp_dir": "temp",
     
     # 应用相关配置
-    "app_name": "OCR Application",
+    "app_name": "Infrastructure Framework",
     "app_version": "1.0.0",
     "debug_mode": False,
     "auto_save_config": True,
     
-    # OCR相关配置
-    "ocr_engine": "paddle",
-    "ocr_language": "ch",
-    "ocr_confidence_threshold": 0.5,
-    "ocr_batch_size": 1,
+    # 通用性能配置
+    "max_workers": 4,
+    "timeout": 30.0,
 }
 
 # 定义验证函数类型
@@ -53,8 +51,8 @@ CONFIG_VALIDATORS: Dict[str, ValidatorFunc] = {
     "log_level": lambda x: x in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     "log_max_size_mb": lambda x: isinstance(x, int) and x > 0,
     "log_backup_count": lambda x: isinstance(x, int) and x >= 0,
-    "ocr_confidence_threshold": lambda x: isinstance(x, (int, float)) and 0 <= x <= 1,
-    "ocr_batch_size": lambda x: isinstance(x, int) and x > 0,
     "debug_mode": lambda x: isinstance(x, bool),
     "auto_save_config": lambda x: isinstance(x, bool),
+    "max_workers": lambda x: isinstance(x, int) and x > 0,
+    "timeout": lambda x: isinstance(x, (int, float)) and x > 0,
 }

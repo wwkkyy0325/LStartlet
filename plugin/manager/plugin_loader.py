@@ -31,44 +31,44 @@ class PluginLoader:
         """
         try:
             if not os.path.exists(plugin_file_path):
-                raise PluginLoadError("unknown", f"插件文件不存在: {plugin_file_path}")
+                raise PluginLoadError("unknown", f"Plugin file does not exist: {plugin_file_path}")
             
-            # 获取插件模块名称
+            # Get plugin module name
             plugin_dir = os.path.dirname(plugin_file_path)
             plugin_filename = os.path.basename(plugin_file_path)
             if not plugin_filename.endswith('.py'):
-                raise PluginLoadError("unknown", f"插件文件必须是 .py 文件: {plugin_file_path}")
+                raise PluginLoadError("unknown", f"Plugin file must be a .py file: {plugin_file_path}")
             
-            module_name = plugin_filename[:-3]  # 移除 .py 扩展名
+            module_name = plugin_filename[:-3]  # Remove .py extension
             
-            # 添加插件目录到 Python 路径（如果还没有添加）
+            # Add plugin directory to Python path (if not already added)
             if plugin_dir not in sys.path:
                 sys.path.insert(0, plugin_dir)
             
-            # 检查模块是否已经加载
+            # Check if module is already loaded
             if module_name in self._loaded_modules:
                 return self._get_plugin_class_from_module(self._loaded_modules[module_name])
             
-            # 动态加载模块
+            # Dynamically load module
             spec = importlib.util.spec_from_file_location(module_name, plugin_file_path)
             if spec is None or spec.loader is None:
-                raise PluginLoadError("unknown", f"无法加载插件模块: {plugin_file_path}")
+                raise PluginLoadError("unknown", f"Unable to load plugin module: {plugin_file_path}")
             
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             
-            # 缓存加载的模块
+            # Cache loaded module
             self._loaded_modules[module_name] = module
             
-            # 从模块中获取插件类
+            # Get plugin class from module
             plugin_class = self._get_plugin_class_from_module(module)
             if plugin_class is None:
-                raise PluginLoadError("unknown", f"插件模块 {plugin_file_path} 中未找到有效的插件类")
+                raise PluginLoadError("unknown", f"Plugin module {plugin_file_path} does not contain a valid plugin class")
             
             return plugin_class
             
         except Exception as e:
-            raise PluginLoadError("unknown", f"加载插件文件失败: {plugin_file_path}, 错误: {e}", e)
+            raise PluginLoadError("unknown", f"Failed to load plugin file: {plugin_file_path}, Error: {e}", e)
     
     def _get_plugin_class_from_module(self, module: Any) -> Optional[Type[PluginBase]]:
         """
@@ -80,10 +80,10 @@ class PluginLoader:
         Returns:
             插件类或 None
         """
-        # 查找所有继承自 PluginBase 的类
+        # Find all classes that inherit from PluginBase
         plugin_classes: List[Type[PluginBase]] = []
         for attr_name in dir(module):
-            # 跳过私有属性和特殊方法
+            # Skip private attributes and special methods
             if attr_name.startswith('_'):
                 continue
                 
@@ -91,7 +91,7 @@ class PluginLoader:
             if (isinstance(attr, type) and 
                 issubclass(attr, PluginBase) and 
                 attr != PluginBase):
-                # 额外检查：确保类定义在当前模块中（避免导入的类）
+                # Additional check: Ensure class is defined in the current module (avoid imported classes)
                 if hasattr(attr, '__module__') and attr.__module__ == module.__name__:
                     print(f"DEBUG: Found plugin class: {attr_name}, module: {attr.__module__}")
                     plugin_classes.append(attr)
@@ -100,7 +100,7 @@ class PluginLoader:
             print(f"DEBUG: No plugin classes found in module {module.__name__}")
             return None
         elif len(plugin_classes) > 1:
-            # 如果有多个插件类，选择第一个
+            # If multiple plugin classes are found, select the first one
             print(f"DEBUG: Multiple plugin classes found, selecting first: {plugin_classes[0].__name__}")
             return plugin_classes[0]
         else:
@@ -122,19 +122,19 @@ class PluginLoader:
         if not os.path.exists(plugin_dir):
             return plugin_classes
         
-        # 遍历目录中的所有 .py 文件
+        # Traverse all .py files in the directory
         for filename in os.listdir(plugin_dir):
             if filename.endswith('.py') and not filename.startswith('__'):
                 file_path = os.path.join(plugin_dir, filename)
                 try:
                     plugin_class = self.load_plugin_from_file(file_path)
                     if plugin_class is not None:
-                        # 直接使用类名作为插件ID（临时方案）
-                        # 实际项目中应该要求插件类定义静态属性或方法来获取plugin_id
+                        # Directly use class name as plugin ID (temporary solution)
+                        # In a real project, plugins should define a static attribute or method to get plugin_id
                         plugin_id = plugin_class.__name__
                         plugin_classes[plugin_id] = plugin_class
                 except Exception as e:
-                    # 记录错误但继续加载其他插件
+                    # Log error but continue loading other plugins
                     print(f"警告: 加载插件 {filename} 失败: {e}")
                     continue
         

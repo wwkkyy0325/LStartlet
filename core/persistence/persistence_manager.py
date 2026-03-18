@@ -11,6 +11,7 @@ from core.persistence.storage.kv_storage import KVStorage
 from core.persistence.models.persistence_models import StorageConfig
 from core.persistence.exceptions.persistence_exceptions import StorageNotFoundError
 from core.logger import info, error
+from core.decorators import with_error_handling, with_logging, monitor_metrics
 
 
 class PersistenceManager:
@@ -31,6 +32,9 @@ class PersistenceManager:
         # 确保数据目录存在
         os.makedirs(data_dir, exist_ok=True)
     
+    @monitor_metrics("persistence_initialize", include_labels=True)
+    @with_error_handling(error_code="PERSISTENCE_INIT_ERROR", default_return=False)
+    @with_logging(level="info", measure_time=True)
     def initialize(self) -> bool:
         """
         初始化持久化管理器
@@ -46,7 +50,7 @@ class PersistenceManager:
             default_config = StorageConfig(
                 name="default",
                 storage_type="file",
-                path=os.path.join(self._data_dir, "default.json")
+                path=os.path.join(self._data_dir, "default.yaml")
             )
             
             default_storage = KVStorage(default_config)
@@ -60,7 +64,7 @@ class PersistenceManager:
             user_prefs_config = StorageConfig(
                 name="user_preferences",
                 storage_type="file",
-                path=os.path.join(self._data_dir, "user_preferences.json")
+                path=os.path.join(self._data_dir, "user_preferences.yaml")
             )
             
             user_prefs_storage = KVStorage(user_prefs_config)
@@ -74,7 +78,7 @@ class PersistenceManager:
             window_state_config = StorageConfig(
                 name="window_state",
                 storage_type="file",
-                path=os.path.join(self._data_dir, "window_state.json")
+                path=os.path.join(self._data_dir, "window_state.yaml")
             )
             
             window_state_storage = KVStorage(window_state_config)

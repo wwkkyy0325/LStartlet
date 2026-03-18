@@ -1,17 +1,17 @@
-"""
-配置管理器工具函数
-"""
+"""配置管理器工具函数"""
 
+import yaml
 import os
-import json
-from typing import Any, Dict, Tuple, Union, cast
+from typing import Any, Dict, Union, Tuple, cast
 from core.path import ensure_directory_exists
+from core.decorators import with_error_handling, with_logging, monitor_metrics # type: ignore
 
 
 class ConfigUtils:
     """配置工具类"""
     
     @staticmethod
+    @monitor_metrics("config_validate_type", include_labels=True)
     def validate_config_type(value: Any, expected_type: str) -> bool:
         """
         验证配置值的类型
@@ -40,6 +40,8 @@ class ConfigUtils:
         return isinstance(value, expected_python_type)
     
     @staticmethod
+    @with_error_handling(error_code="CONFIG_GET_NESTED_ERROR", default_return=None)
+    @monitor_metrics("config_get_nested", include_labels=True)
     def safe_get_nested_value(data: Dict[str, Any], key_path: str, default: Any = None) -> Any:
         """
         安全获取嵌套字典中的值
@@ -66,6 +68,8 @@ class ConfigUtils:
             return default
     
     @staticmethod
+    @with_error_handling(error_code="CONFIG_SET_NESTED_ERROR", default_return=False)
+    @monitor_metrics("config_set_nested", include_labels=True)
     def safe_set_nested_value(data: Dict[str, Any], key_path: str, value: Any) -> bool:
         """
         安全设置嵌套字典中的值
@@ -93,6 +97,7 @@ class ConfigUtils:
             return False
     
     @staticmethod
+    @monitor_metrics("config_merge", include_labels=True)
     def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
         """
         合并两个配置字典（深度合并）
@@ -121,6 +126,8 @@ class ConfigUtils:
         return result
     
     @staticmethod
+    @with_error_handling(error_code="CONFIG_BACKUP_ERROR", default_return=False)
+    @monitor_metrics("config_backup", include_labels=True)
     def create_config_backup(config_data: Dict[str, Any], backup_dir: str, max_backups: int = 5) -> bool:
         """
         创建配置备份
@@ -149,10 +156,10 @@ class ConfigUtils:
             # 创建新备份
             import datetime
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_path = os.path.join(backup_dir, f'config_backup_{timestamp}.json')
+            backup_path = os.path.join(backup_dir, f'config_backup_{timestamp}.yaml')
             
             with open(backup_path, 'w', encoding='utf-8') as f:
-                json.dump(config_data, f, indent=2, ensure_ascii=False)
+                yaml.dump(config_data, f, allow_unicode=True, indent=2, sort_keys=False)
             
             return True
         except Exception:

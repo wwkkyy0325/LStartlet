@@ -1,7 +1,5 @@
-"""
-事件总线
-实现事件的发布、订阅和分发功能
-"""
+"""事件总线
+实现事件的发布、订阅和分发功能"""
 
 from typing import Dict, List, Set, Callable, Type
 from threading import Lock, RLock
@@ -12,6 +10,7 @@ from .event_handler import EventHandler, LambdaEventHandler
 from .event_type_registry import EventTypeRegistry
 # 使用项目自定义日志管理器
 from core.logger import error
+from core.decorators import with_error_handling, monitor_metrics
 
 
 class EventBus:
@@ -38,28 +37,12 @@ class EventBus:
         self._rw_lock = RLock()
         self._async_enabled = False
         
-        # 注册UI事件类型
-        self._register_ui_event_types()
-        # 注册调度事件类型
+        # 只注册调度事件类型
         self._register_scheduler_event_types()
     
     def _register_ui_event_types(self) -> None:
-        """注册UI相关的事件类型"""
-        try:
-            from .events.ui_events import (
-                UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
-                UIMountAreaEvent, UIComponentLifecycleEvent, RenderProcessReadyEvent
-            )
-            registry = self._type_registry
-            registry.register_event_type(UIStyleUpdateEvent.EVENT_TYPE, UIStyleUpdateEvent, "ui")
-            registry.register_event_type(UIConfigChangeEvent.EVENT_TYPE, UIConfigChangeEvent, "ui")
-            registry.register_event_type(UIStateChangeEvent.EVENT_TYPE, UIStateChangeEvent, "ui")
-            registry.register_event_type(UIMountAreaEvent.EVENT_TYPE, UIMountAreaEvent, "ui")
-            registry.register_event_type(UIComponentLifecycleEvent.EVENT_TYPE, UIComponentLifecycleEvent, "ui")
-            registry.register_event_type(RenderProcessReadyEvent.EVENT_TYPE, RenderProcessReadyEvent, "ui")
-        except ImportError:
-            # 如果UI事件模块不存在，跳过注册（保持向后兼容）
-            pass
+        """注册UI相关的事件类型 - 已禁用"""
+        pass
     
     def _register_scheduler_event_types(self) -> None:
         """注册调度相关的事件类型"""
@@ -90,7 +73,7 @@ class EventBus:
     def _ensure_event_type_registered(self, event_type: str, event_class: Type[BaseEvent]) -> None:
         """确保事件类型已注册，如果未注册则尝试注册"""
         if not self._type_registry.is_registered(event_type):
-            # 尝试从已知模块中注册
+            # 只尝试注册调度器相关的事件类型
             try:
                 if event_type.startswith("scheduler."):
                     from .events.scheduler_events import (
@@ -118,28 +101,16 @@ class EventBus:
                     # 单独处理配置项注册事件，使用字符串字面量避免未绑定错误
                     from .events.scheduler_events import ConfigItemRegisteredEvent
                     self._type_registry.register_event_type(ConfigItemRegisteredEvent.EVENT_TYPE, ConfigItemRegisteredEvent, "scheduler")
-                elif event_type.startswith("ui."):
-                    from .events.ui_events import (
-                        UIStyleUpdateEvent, UIConfigChangeEvent, UIStateChangeEvent,
-                        UIMountAreaEvent, UIComponentLifecycleEvent, RenderProcessReadyEvent
-                    )
-                    ui_event_map: Dict[str, Type[BaseEvent]] = {
-                        UIStyleUpdateEvent.EVENT_TYPE: UIStyleUpdateEvent,
-                        UIConfigChangeEvent.EVENT_TYPE: UIConfigChangeEvent,
-                        UIStateChangeEvent.EVENT_TYPE: UIStateChangeEvent,
-                        UIMountAreaEvent.EVENT_TYPE: UIMountAreaEvent,
-                        UIComponentLifecycleEvent.EVENT_TYPE: UIComponentLifecycleEvent,
-                        RenderProcessReadyEvent.EVENT_TYPE: RenderProcessReadyEvent
-                    }
-                    if event_type in ui_event_map:
-                        self._type_registry.register_event_type(event_type, ui_event_map[event_type], "ui")
             except ImportError:
                 pass
     
+    @monitor_metrics("eventbus_enable_async", include_labels=True)
     def enable_async_support(self) -> None:
         """启用异步事件支持"""
         self._async_enabled = True
     
+    @with_error_handling(error_code="EVENT_SUBSCRIBE_ERROR", default_return=None)
+    @monitor_metrics("eventbus_subscribe", include_labels=True)
     def subscribe(self, event_type: str, handler: EventHandler) -> None:
         """
         订阅事件
@@ -157,6 +128,8 @@ class EventBus:
         with self._rw_lock:
             self._handlers[event_type].append(handler)
     
+    @with_error_handling(error_code="EVENT_SUBSCRIBE_LAMBDA_ERROR", default_return=None)
+    @monitor_metrics("eventbus_subscribe_lambda", include_labels=True)
     def subscribe_lambda(self, event_type: str, handler_func: Callable[[BaseEvent], bool], name: str = "") -> None:
         """
         使用Lambda函数订阅事件
@@ -169,6 +142,8 @@ class EventBus:
         lambda_handler = LambdaEventHandler(handler_func, name)
         self.subscribe(event_type, lambda_handler)
     
+    @with_error_handling(error_code="EVENT_UNSUBSCRIBE_ERROR", default_return=False)
+    @monitor_metrics("eventbus_unsubscribe", include_labels=True)
     def unsubscribe(self, event_type: str, handler: EventHandler) -> bool:
         """
         取消订阅事件
@@ -189,6 +164,7 @@ class EventBus:
                     return False
             return False
     
+    @monitor_metrics("eventbus_unsubscribe_all", include_labels=True)
     def unsubscribe_all(self, event_type: str) -> None:
         """
         取消订阅指定事件类型的所有处理器
@@ -200,6 +176,8 @@ class EventBus:
             if event_type in self._handlers:
                 del self._handlers[event_type]
     
+    @with_error_handling(error_code="EVENT_PUBLISH_ERROR", default_return=False)
+    @monitor_metrics("eventbus_publish", include_labels=True)
     def publish(self, event: BaseEvent) -> bool:
         """
         发布事件（同步）
@@ -234,6 +212,8 @@ class EventBus:
         
         return handled
     
+    @with_error_handling(error_code="EVENT_PUBLISH_ASYNC_ERROR", default_return=False)
+    @monitor_metrics("eventbus_publish_async", include_labels=True)
     async def publish_async(self, event: BaseEvent) -> bool:
         """
         异步发布事件
@@ -294,6 +274,7 @@ class EventBus:
             error(f"事件处理器执行失败: {e}", extra={"handler": handler.name, "event_type": event.event_type})
             return False
     
+    @monitor_metrics("eventbus_get_type_registry", include_labels=True)
     def get_type_registry(self) -> EventTypeRegistry:
         """
         获取事件类型注册器
@@ -303,6 +284,7 @@ class EventBus:
         """
         return self._type_registry
     
+    @monitor_metrics("eventbus_get_subscribers_count", include_labels=True)
     def get_subscribers_count(self, event_type: str) -> int:
         """
         获取指定事件类型的订阅者数量
@@ -316,6 +298,7 @@ class EventBus:
         with self._rw_lock:
             return len(self._handlers.get(event_type, []))
     
+    @monitor_metrics("eventbus_get_all_subscribed_types", include_labels=True)
     def get_all_subscribed_types(self) -> Set[str]:
         """
         获取所有已订阅的事件类型
@@ -326,6 +309,7 @@ class EventBus:
         with self._rw_lock:
             return set(self._handlers.keys())
     
+    @monitor_metrics("eventbus_clear_all_subscriptions", include_labels=True)
     def clear_all_subscriptions(self) -> None:
         """清除所有订阅"""
         with self._rw_lock:

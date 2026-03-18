@@ -36,7 +36,7 @@ class TestPluginDependencyManager(unittest.TestCase):
     
     def test_load_installed_deps_empty(self):
         """测试加载空的已安装依赖记录"""
-        deps_file = os.path.join(self.test_dir, "installed_deps.json")
+        deps_file = os.path.join(self.test_dir, "installed_deps.yaml")
         if os.path.exists(deps_file):
             os.remove(deps_file)
         deps = self.dep_manager._load_installed_deps()  # type: ignore

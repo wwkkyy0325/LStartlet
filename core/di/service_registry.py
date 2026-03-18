@@ -2,7 +2,6 @@ from core.di.container_config import ContainerConfigurator
 from core.config.config_manager import ConfigManager
 from core.event.event_bus import EventBus
 from core.logger.logger import MultiProcessLogger
-from ui.ui_service_registry import register_ui_services
 
 
 def register_core_services(configurator: ContainerConfigurator) -> None:
@@ -21,9 +20,6 @@ def register_application_services(configurator: ContainerConfigurator) -> None:
     """注册应用程序特定服务"""
     # 注册核心服务
     register_core_services(configurator)
-    
-    # 注册UI服务
-    register_ui_services(configurator)
     
     # 这里可以添加更多应用特定的服务
     # configurator.register_transient(SomeService)

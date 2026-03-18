@@ -23,10 +23,10 @@ class ErrorFormatter:
         formatted = f"[{error_info['timestamp']}] {error_info['error_type']}: {error_info['message']}"
         
         if error_info.get('error_code'):
-            formatted += f" (错误码: {error_info['error_code']})"
+            formatted += f" (Error Code: {error_info['error_code']})"
         
         if include_traceback and error_info.get('traceback'):
-            formatted += f"\n堆栈跟踪:\n{error_info['traceback']}"
+            formatted += f"\nTraceback:\n{error_info['traceback']}"
         
         return formatted
     

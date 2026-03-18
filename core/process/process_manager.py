@@ -48,14 +48,14 @@ class GlobalProcessManager:
         # 注册程序退出时的清理函数
         self._register_cleanup()
         
-        # 记录主进程
+        # Record main process
         main_pid = os.getpid()
         self.register_process(
             pid=main_pid,
             process_type="main",
-            description="主应用程序进程"
+            description="Main application process"
         )
-        info(f"主进程已注册，PID: {main_pid}")
+        info(f"Main process registered, PID: {main_pid}")
     
     def _register_cleanup(self) -> None:
         """注册清理函数"""
@@ -72,17 +72,17 @@ class GlobalProcessManager:
         callback: Optional[Callable[[int, str], None]] = None
     ) -> None:
         """
-        注册新进程
+        Register new process
         
         Args:
-            pid: 进程ID
-            process_type: 进程类型
-            description: 进程描述
-            callback: 进程关闭后的回调函数
+            pid: Process ID
+            process_type: Process type
+            description: Process description
+            callback: Callback function after process shutdown
         """
         with self._process_lock:
             if pid in self._processes:
-                warning(f"进程 {pid} 已存在，更新信息")
+                warning(f"Process {pid} already exists, updating information")
             
             process_info = ProcessInfo(
                 pid=pid,
@@ -93,7 +93,7 @@ class GlobalProcessManager:
                 is_active=True
             )
             self._processes[pid] = process_info
-            info(f"进程已注册 - PID: {pid}, 类型: {process_type}, 描述: {description}")
+            info(f"Process registered - PID: {pid}, Type: {process_type}, Description: {description}")
     
     def get_process_info(self, pid: int) -> Optional[ProcessInfo]:
         """

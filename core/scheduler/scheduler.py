@@ -6,10 +6,12 @@
 import asyncio
 from typing import Optional, Dict, Any, Callable, TypeVar, Awaitable, Union
 # 使用项目自定义日志管理器
-from core.logger import info, warning, error # type: ignore
+from core.logger import info, warning, error
 # 使用项目自定义错误处理系统
 from core.error import handle_error
-from core.error.exceptions import OCRInitializationError, OCRProcessingError, OCRConfigError
+from core.error.exceptions import OCRProcessingError, OCRConfigError
+# 导入装饰器
+from core.decorators import with_error_handling, with_logging, monitor_metrics, monitor_metrics_async
 # 使用事件系统 - 只导入需要的事件
 from core.event.events.scheduler_events import (
     SchedulerStatusEvent, TaskSubmittedEvent
@@ -112,58 +114,69 @@ class Scheduler:
     def event_bus(self) -> EventBus:
         """获取事件总线实例"""
         return self._event_bus  # type: ignore
+    
+    def get_config_manager(self) -> CoreConfigManager:
+        """获取配置管理器实例"""
+        return self._config_manager
 
+    @monitor_metrics("scheduler_start", include_labels=True)
+    @with_error_handling(error_code="SCHEDULER_START_ERROR", default_return=None)
+    @with_logging(level="info", measure_time=True)
     def start(self) -> None:
-        """启动调度器"""
+        """Start scheduler"""
+        if self._is_running:
+            warning("Scheduler is already running")
+            return
+        
         try:
-            if self._is_running:
-                warning("Scheduler is already running")
-                return
-            
-            # 启动进程管理器
+            # Start all components
             self._process_manager.start()
+            # TaskDispatcher doesn't need explicit startup, it works automatically when needed
             
-            # 移除配置验证，因为ConfigManager没有validate_config方法
-            info("Skipping config validation - validate_config method not available")
+            # Start tick component only if there's a running event loop
+            try:
+                self._tick_component.start()
+            except RuntimeError as e:
+                if "no running event loop" in str(e):
+                    # In synchronous context without event loop, skip tick component
+                    warning("No running event loop detected, skipping tick component startup")
+                else:
+                    raise
             
             self._is_running = True
+            
+            # Publish start event
+            self._event_bus.publish(SchedulerStatusEvent("started"))
             info("Scheduler started successfully")
             
-            # 发布调度器启动事件
-            self.event_bus.publish(SchedulerStatusEvent("started", {
-                "config": self.config.to_dict()
-            }))
         except Exception as e:
-            error_msg = f"启动调度器失败: {e}"
-            handle_error(OCRInitializationError(error_msg))
+            error(f"Scheduler failed to start: {e}")
+            self._is_running = False
             raise
-    
+
+    @monitor_metrics("scheduler_stop", include_labels=True)
+    @with_error_handling(error_code="SCHEDULER_STOP_ERROR", default_return=None)
+    @with_logging(level="info", measure_time=True)
     def stop(self) -> None:
-        """停止调度器"""
+        """Stop scheduler"""
+        if not self._is_running:
+            warning("Scheduler is not running")
+            return
+        
         try:
-            if not self._is_running:
-                return
-            
-            # 停止tick组件
+            # Stop all components (reverse order)
             self._tick_component.stop()
-            
-            # 停止任务分发器（等待所有任务完成）
-            # 注意：这需要在异步上下文中调用
-            info("Stopping scheduler...")
-            
-            # 停止进程管理器
+            # TaskDispatcher doesn't need explicit shutdown
             self._process_manager.stop()
             
             self._is_running = False
+            
+            # Publish stop event
+            self._event_bus.publish(SchedulerStatusEvent("stopped"))
             info("Scheduler stopped successfully")
             
-            # 发布调度器停止事件
-            self.event_bus.publish(SchedulerStatusEvent("stopped", {
-                "status": self.get_status()
-            }))
         except Exception as e:
-            error_msg = f"停止调度器失败: {e}"
-            handle_error(OCRProcessingError(error_msg))
+            error(f"Scheduler failed to stop: {e}")
             raise
     
     def update_config(self, **kwargs: Any) -> None:
@@ -177,15 +190,15 @@ class Scheduler:
             if self._is_running:
                 warning("Updating configuration while scheduler is running")
             
-            # 更新配置管理器
+            # Update config manager
             for key, value in kwargs.items():
                 self._config_manager.set_config(key, value)
             
-            # 更新相关组件配置 - 从配置管理器重新获取配置
+            # Update related component configs - re-fetch from config manager
             config_dict = self._config_manager.get_config("scheduler")
             if config_dict is not None:
-                # 注意：ProcessManager和TaskDispatcher的属性可能需要setter方法
-                # 如果没有setter，我们可能需要重新创建这些组件
+                # Note: ProcessManager and TaskDispatcher properties may need setter methods
+                # If no setter, we may need to recreate these components
                 if hasattr(self._process_manager, 'max_processes'):
                     self._process_manager.max_processes = config_dict.get('max_processes', 4)
                 if hasattr(self._process_manager, 'process_timeout'):
@@ -193,7 +206,7 @@ class Scheduler:
                 if hasattr(self._task_dispatcher, 'max_concurrent_tasks'):
                     self._task_dispatcher.max_concurrent_tasks = config_dict.get('max_concurrent_tasks', 10)
             
-            # 发布配置更新事件
+            # Publish config update event
             self.event_bus.publish(SchedulerStatusEvent("config_updated", {
                 "updated_config": kwargs,
                 "current_config": config_dict or {}
@@ -203,6 +216,7 @@ class Scheduler:
             handle_error(OCRConfigError(error_msg, context=kwargs))
             raise
     
+    @monitor_metrics("scheduler_submit_task", include_labels=True)
     async def submit_task(
         self,
         task_id: str,
@@ -210,7 +224,7 @@ class Scheduler:
         *args: Any,
         priority: Union[TaskPriority, str] = TaskPriority.NORMAL,
         timeout: Optional[float] = None,
-        max_retries: Optional[int] = None,
+        max_retries: int = 3,
         **kwargs: Any
     ) -> Optional[T]:
         """
@@ -234,7 +248,7 @@ class Scheduler:
                 handle_error(OCRProcessingError(error_msg))
                 raise RuntimeError(error_msg)
             
-            # 处理优先级参数
+            # Handle priority parameter
             if isinstance(priority, str):
                 try:
                     priority = TaskPriority[priority.upper()]
@@ -243,7 +257,7 @@ class Scheduler:
                     handle_error(OCRConfigError(error_msg))
                     raise ValueError(error_msg)
             
-            # 使用配置中的默认值
+            # Use defaults from config
             actual_timeout = timeout
             actual_max_retries = max_retries
             
@@ -255,7 +269,7 @@ class Scheduler:
                 actual_timeout = timeout or 60.0
                 actual_max_retries = max_retries or 3
             
-            # 提交任务到分发器
+            # Submit task to dispatcher
             self._task_dispatcher.submit_task(
                 task_id=task_id,
                 func=func,
@@ -266,7 +280,7 @@ class Scheduler:
                 **kwargs
             )
             
-            # 发布任务提交事件
+            # Publish task submitted event
             task_data: Dict[str, Any] = {
                 "func_name": getattr(func, "__name__", str(func)),
                 "priority": priority.name if hasattr(priority, "name") else str(priority),
@@ -277,11 +291,11 @@ class Scheduler:
             }
             self.event_bus.publish(TaskSubmittedEvent(task_id, task_data))
             
-            # 立即分发任务
+            # Immediately dispatch task
             await self._task_dispatcher.dispatch_next_task()
             
-            # 注意：当前设计中无法直接返回任务结果
-            # 需要通过其他机制（如回调或Future）来获取结果
+            # Note: Current design cannot directly return task result
+            # Need to use other mechanisms (like callbacks or Future) to get result
             warning("submit_task result handling needs refinement in current design")
             return None
         except Exception as e:
@@ -309,6 +323,7 @@ class Scheduler:
             handle_error(OCRProcessingError(error_msg))
             return {}
 
+    @monitor_metrics_async("scheduler_run_loop", include_labels=True)
     async def run_scheduler_loop(self) -> None:
         """运行调度器主循环"""
         try:
@@ -320,12 +335,12 @@ class Scheduler:
             info("Starting scheduler main loop")
             
             while self._is_running:
-                # 分发任务
+                # Dispatch tasks
                 while (self._task_dispatcher.get_queue_size() > 0 and 
                        self._task_dispatcher.get_active_task_count() < self._task_dispatcher.max_concurrent_tasks):
                     await self._task_dispatcher.dispatch_next_task()
                 
-                # 短暂休眠以避免CPU占用过高
+                # Short sleep to avoid high CPU usage
                 await asyncio.sleep(0.01)
                 
         except asyncio.CancelledError:
@@ -337,6 +352,7 @@ class Scheduler:
         finally:
             info("Scheduler loop ended")
     
+    @monitor_metrics_async("scheduler_wait_completion", include_labels=True)
     async def wait_for_completion(self) -> None:
         """等待所有任务完成"""
         try:
