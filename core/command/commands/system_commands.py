@@ -3,7 +3,7 @@ import psutil # type: ignore
 import os # type: ignore
 from typing import Dict, Any, Optional # type: ignore
 from core.command.command_base import BaseCommand, CommandResult, CommandMetadata
-from core.decorators import require_permission, PermissionLevel
+from core.decorators import require_permission, PermissionLevel, with_error_handling, with_logging
 
 
 class EchoCommand(BaseCommand):
@@ -18,6 +18,8 @@ class EchoCommand(BaseCommand):
         )
         super().__init__(metadata)
     
+    @with_error_handling(error_code="ECHO_COMMAND_ERROR", default_return=None)
+    @with_logging(level="debug", include_args=True)
     def execute(self, **kwargs: Any) -> CommandResult:
         """执行回显命令"""
         message = kwargs.get("message")
@@ -49,6 +51,8 @@ class ShutdownCommand(BaseCommand):
         super().__init__(metadata)
     
     @require_permission(PermissionLevel.ADMIN, "Only administrators can execute shutdown operations")
+    @with_error_handling(error_code="SHUTDOWN_COMMAND_ERROR", default_return=None)
+    @with_logging(level="info", measure_time=True)
     def execute(self, **kwargs: Any) -> CommandResult:
         """Execute shutdown command"""
         # Actual shutdown logic
@@ -68,6 +72,8 @@ class ClearCacheCommand(BaseCommand):
         super().__init__(metadata)
     
     @require_permission(PermissionLevel.USER, "User permission required to clear cache")
+    @with_error_handling(error_code="CLEAR_CACHE_COMMAND_ERROR", default_return=None)
+    @with_logging(level="info", measure_time=True)
     def execute(self, **kwargs: Any) -> CommandResult:
         """Execute clear cache command"""
         # Actual cache clearing logic
@@ -87,6 +93,8 @@ class SystemInfoCommand(BaseCommand):
         )
         super().__init__(metadata)
     
+    @with_error_handling(error_code="SYSTEM_INFO_COMMAND_ERROR", default_return=None)
+    @with_logging(level="info", measure_time=True)
     def execute(self, **kwargs: Any) -> CommandResult:
         """执行系统信息命令"""
         import platform
@@ -101,24 +109,21 @@ class SystemInfoCommand(BaseCommand):
             info: dict[str, Any] = {
                 "version": "1.0.0",
                 "platform": platform.system(),
+                "platform_version": platform.version(),
+                "platform_release": platform.release(),
+                "architecture": platform.machine(),
                 "python_version": sys.version,
+                "python_implementation": platform.python_implementation(),
+                "processor": platform.processor(),
                 "cpu_count": psutil.cpu_count(),
-                "memory": psutil.virtual_memory().total,
-                "platform_details": {
-                    "node": platform.node(),
-                    "release": platform.release(),
-                    "version": platform.version(),
-                    "machine": platform.machine(),
-                    "processor": platform.processor()
-                }
+                "memory_total": psutil.virtual_memory().total,
+                "memory_available": psutil.virtual_memory().available
             }
         else:
-            # 基本模式
-            from typing import Any
-            info: dict[str, Any] = {
+            # 基础模式
+            info = {
                 "version": "1.0.0",
                 "platform": platform.system(),
                 "python_version": sys.version
             }
-        
-        return CommandResult.success("系统信息获取成功", info)
+        return CommandResult.success("System information retrieved successfully", info)

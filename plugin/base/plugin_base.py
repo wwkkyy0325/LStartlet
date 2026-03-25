@@ -58,20 +58,20 @@ class PluginBase(ABC):
         """检查插件是否已启动"""
         return self._is_started
     
-    @abstractmethod
     def get_dependencies(self) -> Dict[str, str]:
         """
         获取插件依赖信息
         
         Returns:
             依赖字典，格式: {"dependency_name": "version_requirement"}
-            例如: {"core": ">=1.0.0", "ui": ">=1.0.0"}
+            例如: {"requests": ">=2.25.0", "pillow": ">=8.0.0"}
             
         Note:
-            推荐使用类属性 PLUGIN_DEPENDENCIES 进行静态依赖声明，
-            这样可以在不实例化插件的情况下解析依赖。
+            推荐在 plugin.json 中声明依赖，这样可以在不实例化插件的情况下解析依赖。
+            此方法主要用于向后兼容或动态依赖场景。
         """
-        pass
+        # 默认返回空依赖，子类可以重写此方法
+        return {}
     
     @abstractmethod
     def get_provided_services(self) -> Dict[str, Any]:

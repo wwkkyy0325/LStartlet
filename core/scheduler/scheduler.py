@@ -135,13 +135,12 @@ class Scheduler:
             
             # Start tick component only if there's a running event loop
             try:
+                asyncio.get_running_loop()
+                # Only start tick component if we're in an async context with running loop
                 self._tick_component.start()
-            except RuntimeError as e:
-                if "no running event loop" in str(e):
-                    # In synchronous context without event loop, skip tick component
-                    warning("No running event loop detected, skipping tick component startup")
-                else:
-                    raise
+            except RuntimeError:
+                # In synchronous context without event loop, skip tick component
+                warning("No running event loop detected, skipping tick component startup")
             
             self._is_running = True
             

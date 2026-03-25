@@ -109,8 +109,23 @@ class TestPluginManager(unittest.TestCase):
     
     def test_unload_plugin_success(self):
         """测试成功卸载插件"""
+        # 创建模拟插件元数据
+        from plugin.manager.plugin_loader import PluginMetadata
+        mock_metadata = PluginMetadata(
+            namespace="mock_plugin",
+            name="Mock Plugin",
+            version="1.0.0",
+            author="Test",
+            description="Mock plugin for testing",
+            compatibility={"min_version": "1.0.0", "max_version": "2.0.0"},
+            entry_point={"module": "mock", "class": "MockPlugin"},
+            dependencies={},
+            permissions=[]
+        )
+        
         # 直接添加并初始化插件
         self.plugin_manager._plugin_classes["mock_plugin"] = MockPlugin  # type: ignore
+        self.plugin_manager._plugin_metadata["mock_plugin"] = mock_metadata
         self.plugin_manager.initialize_all_plugins()
         
         # 确保插件已加载

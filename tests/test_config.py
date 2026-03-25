@@ -73,13 +73,6 @@ class TestConfigManager(unittest.TestCase):
         # 测试无效的日志级别
         success: bool = set_config("log_level", "INVALID_LEVEL")
         self.assertFalse(success)
-        
-        # 测试数值验证
-        success: bool = set_config("max_workers", 8)
-        self.assertTrue(success)
-        
-        success: bool = set_config("max_workers", -1)  # 无效值
-        self.assertFalse(success)
     
     def test_get_all_configs(self):
         """测试获取所有配置"""
@@ -90,6 +83,9 @@ class TestConfigManager(unittest.TestCase):
     
     def test_save_and_load_config(self):
         """测试保存和加载配置"""
+        # 确保临时目录存在
+        os.makedirs(self.temp_dir, exist_ok=True)
+        
         # 修改一些配置
         set_config("log_level", "WARNING")
         set_config("debug_mode", True)

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import shutil
 import unittest
+import json
 from typing import Dict
 
 # 添加项目根目录到Python路径
@@ -58,25 +59,47 @@ class TestPluginLoader(unittest.TestCase):
     def test_init(self):
         """测试插件加载器初始化"""
         self.assertEqual(len(self.loader._loaded_modules), 0)  # type: ignore
-    
-    def test_load_plugin_from_nonexistent_file(self):
-        """测试加载不存在的插件文件"""
-        with self.assertRaises(Exception):
-            self.loader.load_plugin_from_file("nonexistent.py")
-    
+
     def create_test_plugin_file(self, content: str) -> str:
         """创建测试插件文件"""
-        plugin_file_path = os.path.join(self.test_dir, "test_plugin.py")
+        # 创建插件目录结构
+        plugin_dir = os.path.join(self.test_dir, "simple_test_plugin")
+        os.makedirs(plugin_dir, exist_ok=True)
+        
+        # 创建 plugin.json
+        plugin_json = {
+            "namespace": "com.test.simple_test",
+            "name": "Simple Test Plugin",
+            "version": "1.0.0",
+            "author": "Test Author",
+            "description": "Simple test plugin",
+            "compatibility": {
+                "min_version": "1.0.0",
+                "max_version": "2.0.0"
+            },
+            "entry_point": {
+                "module": "simple_test",
+                "class": "SimpleTestPlugin"
+            },
+            "dependencies": {},
+            "permissions": []
+        }
+        plugin_json_path = os.path.join(plugin_dir, "plugin.json")
+        with open(plugin_json_path, 'w', encoding='utf-8') as f:
+            json.dump(plugin_json, f, indent=2)
+        
+        # 创建插件模块文件
+        plugin_file_path = os.path.join(plugin_dir, "simple_test.py")
         with open(plugin_file_path, 'w', encoding='utf-8') as f:
             f.write(content)
-        return plugin_file_path
-    
-    
+            
+        return plugin_dir
+
     def test_load_plugin_from_directory_empty(self):
         """测试从空目录加载插件"""
         plugins = self.loader.load_plugin_from_directory(self.test_dir)
         self.assertEqual(len(plugins), 0)
-    
+
     def test_load_plugin_from_directory_with_file(self):
         """测试从目录加载插件文件"""
         # 创建一个简单的插件文件，确保继承PluginBase
@@ -84,14 +107,14 @@ class TestPluginLoader(unittest.TestCase):
 from plugin.base.plugin_base import PluginBase
 
 class SimpleTestPlugin(PluginBase):
-    def __init__(self, plugin_id="simple_test", name="Simple Test", version="1.0.0", description="Simple test plugin"):
-        super().__init__(plugin_id, name, version, description)
+    def __init__(self):
+        super().__init__("simple_test", "Simple Test", "1.0.0", "Simple test plugin")
     
     def get_dependencies(self):
         return {}
     
     def get_provided_services(self):
-        return {}
+        return {"simple_service": self}
     
     def _on_initialize(self):
         return True
@@ -110,4 +133,4 @@ class SimpleTestPlugin(PluginBase):
         # 加载插件
         plugins = self.loader.load_plugin_from_directory(self.test_dir)
         self.assertEqual(len(plugins), 1)
-        self.assertIn("SimpleTestPlugin", plugins)
+        self.assertIn("com.test.simple_test", plugins)

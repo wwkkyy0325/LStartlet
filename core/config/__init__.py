@@ -54,7 +54,7 @@ def save_config(filename: str = DEFAULT_CONFIG_FILENAME) -> bool:
     return get_config_manager().save_to_file(filename)
 
 def load_config(filename: str = DEFAULT_CONFIG_FILENAME) -> bool:
-    return get_config_manager().load_from_file(filename)
+    return get_config_manager().load(filename)
 
 def reset_all_configs() -> None:
     get_config_manager().reset_to_defaults()

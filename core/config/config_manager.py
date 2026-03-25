@@ -5,6 +5,7 @@
 
 import yaml
 import os
+import json
 from typing import Any, Dict, Optional, Callable, List, Type, cast
 # 使用项目自定义日志管理器
 from core.logger import info, warning, error, debug
@@ -120,58 +121,45 @@ class ConfigManager:
     @monitor_metrics("config_load", include_labels=True)
     @with_error_handling(error_code="CONFIG_LOAD_ERROR", default_return=False)
     @with_logging(level="info", measure_time=True)
-    def load_from_file(self, filepath: Optional[str] = None) -> bool:
-        """
-        从文件加载配置（保留原有配置，不覆盖）
-        
-        Args:
-            filepath: 文件路径，如果为None则使用初始化时的路径
-            
-        Returns:
-            是否加载成功
-        """
+    def load(self, filepath: Optional[str] = None) -> bool:
+        """加载配置文件"""
         try:
             load_path = filepath or self._config_file
-            if not os.path.exists(load_path):
-                warning(f"Configuration file does not exist: {load_path}")
-                return False
-            
-            with open(load_path, 'r', encoding='utf-8') as f:
-                config_data: Dict[str, Any] = yaml.safe_load(f) or {}
-            
-            success_count = 0
-            
-            # 处理分类配置
-            for source, source_configs in config_data.items():
-                if isinstance(source_configs, dict):
-                    # 使用 cast 明确指定类型
-                    typed_source_configs = cast(Dict[str, Any], source_configs)
-                    for key, value in typed_source_configs.items():
-                        if key in self._config_items:
-                            # 如果配置项已注册，更新其值但保留来源
-                            if self.set_config(key, value):
-                                success_count += 1
-                        else:
-                            # 如果配置项未注册，注册为外部配置
-                            # 这里需要推断类型，简单处理为字符串或保持原类型
-                            value_type = self._infer_value_type(value)
-                            self.register_config_with_source(key, value, value_type, f"从配置文件加载的配置项", plugin_name=source)
-                            success_count += 1
-                else:
-                    # 兼容旧格式（扁平结构）
-                    if source in self._config_items:
-                        if self.set_config(source, source_configs):
-                            success_count += 1
+            if os.path.exists(load_path):
+                with open(load_path, 'r', encoding='utf-8') as f:
+                    if load_path.endswith('.yaml'):
+                        config_data = yaml.safe_load(f)
                     else:
-                        value_type = self._infer_value_type(source_configs)
-                        self.register_config_with_source(source, source_configs, value_type, f"从配置文件加载的配置项", plugin_name="legacy")
-                        success_count += 1
-            
-            info(f"Loaded {success_count} configuration items from file")
-            return True
+                        config_data = json.load(f)
+                
+                # 处理分类格式的配置数据
+                flat_config = {}
+                if isinstance(config_data, dict):
+                    # 检查是否是分类格式（包含 system 或 external 键）
+                    if "system" in config_data or "external" in config_data:
+                        # 分类格式
+                        for category, configs in config_data.items():
+                            if isinstance(configs, dict):
+                                flat_config.update(configs)
+                    else:
+                        # 扁平格式
+                        flat_config = config_data
+                
+                # 更新配置项
+                for key, value in flat_config.items():
+                    if key not in self._config_items:
+                        self._config_items[key] = ConfigItem(key, value, value, type(value), "")
+                    else:
+                        self._config_items[key].current_value = value
+                        self._config_sources[key] = "file"
+                
+                info(f"Configuration loaded from {load_path}")
+                return True
+            else:
+                warning(f"Configuration file {load_path} does not exist")
+                return False
         except Exception as e:
-            error_msg = f"Failed to load configuration: {e}"
-            handle_error(OCRConfigError(error_msg, context={"file_path": filepath}))
+            error(f"Failed to load configuration: {e}")
             return False
     
     def _register_default_configs(self) -> None:
@@ -194,12 +182,6 @@ class ConfigManager:
             self.register_config_with_source("data_dir", "data", str, "Data directory path", plugin_name="system")
             self.register_config_with_source("output_dir", "output", str, "Output directory path", plugin_name="system")
             self.register_config_with_source("temp_dir", "temp", str, "Temporary directory path", plugin_name="system")
-            
-            # General performance configuration
-            self.register_config_with_source("max_workers", 4, int, "Maximum number of worker threads", 
-                                           validator=self._validate_positive_int, plugin_name="system")
-            self.register_config_with_source("timeout", 30.0, float, "Processing timeout (seconds)", 
-                                           validator=self._validate_positive_float, plugin_name="system")
             
             # System behavior configuration
             self.register_config_with_source("auto_save_config", True, bool, "Automatically save configuration", plugin_name="system")
@@ -427,6 +409,9 @@ class ConfigManager:
             configs_by_source[source][key] = config_item.current_value
         return configs_by_source
     
+    @monitor_metrics("config_set", include_labels=True)
+    @with_error_handling(error_code="CONFIG_SET_ERROR", default_return=False)
+    @with_logging(level="debug", include_args=True, measure_time=True)
     def set_config(self, key: str, value: Any) -> bool:
         """
         设置配置项值
@@ -475,6 +460,9 @@ class ConfigManager:
             handle_error(OCRConfigError(error_msg, context={"key": key, "value": value}))
             return False
     
+    @monitor_metrics("config_get", include_labels=True)
+    @with_error_handling(error_code="CONFIG_GET_ERROR", default_return=None)
+    @with_logging(level="debug", include_args=True)
     def get_config(self, key: str, default: Any = None) -> Any:
         """
         Get configuration item value
@@ -486,15 +474,13 @@ class ConfigManager:
         Returns:
             Configuration item value
         """
-        try:
-            if key in self._config_items:
-                return self._config_items[key].current_value
-            return default
-        except Exception as e:
-            error_msg = f"Failed to get configuration item '{key}': {e}"
-            handle_error(OCRConfigError(error_msg, context={"key": key}))
-            return default
+        if key in self._config_items:
+            return self._config_items[key].current_value
+        return default
     
+    @monitor_metrics("config_has", include_labels=True)
+    @with_error_handling(error_code="CONFIG_HAS_ERROR", default_return=False)
+    @with_logging(level="debug", include_args=True)
     def has_config(self, key: str) -> bool:
         """
         Check if configuration item exists
@@ -507,15 +493,16 @@ class ConfigManager:
         """
         return key in self._config_items
     
+    @monitor_metrics("config_get_all", include_labels=True)
+    @with_error_handling(error_code="CONFIG_GET_ALL_ERROR", default_return={})
+    @with_logging(level="debug", measure_time=True)
     def get_all_configs(self) -> Dict[str, Any]:
         """获取所有配置项"""
-        try:
-            return {key: item.current_value for key, item in self._config_items.items()}
-        except Exception as e:
-            error_msg = f"Failed to get all configuration items: {e}"
-            handle_error(OCRConfigError(error_msg))
-            return {}
+        return {key: item.current_value for key, item in self._config_items.items()}
     
+    @monitor_metrics("config_add_listener", include_labels=True)
+    @with_error_handling(error_code="CONFIG_ADD_LISTENER_ERROR")
+    @with_logging(level="debug", include_args=True)
     def add_listener(self, listener: Callable[[str, Any, Any], None]) -> None:
         """
         Add configuration change listener
@@ -523,13 +510,11 @@ class ConfigManager:
         Args:
             listener: Listener function that receives (key name, old value, new value) parameters
         """
-        try:
-            self._listeners.append(listener)
-        except Exception as e:
-            error_msg = f"Failed to add configuration listener: {e}"
-            handle_error(OCRConfigError(error_msg))
-            raise
+        self._listeners.append(listener)
     
+    @monitor_metrics("config_add_key_listener", include_labels=True)
+    @with_error_handling(error_code="CONFIG_ADD_KEY_LISTENER_ERROR")
+    @with_logging(level="debug", include_args=True)
     def add_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]) -> None:
         """
         Add listener for specific configuration item
@@ -538,15 +523,13 @@ class ConfigManager:
             key: Configuration item key name
             listener: Listener function that receives (key name, old value, new value) parameters
         """
-        try:
-            if key not in self._key_listeners:
-                self._key_listeners[key] = []
-            self._key_listeners[key].append(listener)
-        except Exception as e:
-            error_msg = f"Failed to add configuration item listener: {e}"
-            handle_error(OCRConfigError(error_msg))
-            raise
+        if key not in self._key_listeners:
+            self._key_listeners[key] = []
+        self._key_listeners[key].append(listener)
     
+    @monitor_metrics("config_remove_listener", include_labels=True)
+    @with_error_handling(error_code="CONFIG_REMOVE_LISTENER_ERROR", default_return=False)
+    @with_logging(level="debug", include_args=True)
     def remove_listener(self, listener: Callable[[str, Any, Any], None]) -> bool:
         """
         Remove configuration change listener
@@ -562,11 +545,10 @@ class ConfigManager:
             return True
         except ValueError:
             return False
-        except Exception as e:
-            error_msg = f"Failed to remove configuration listener: {e}"
-            handle_error(OCRConfigError(error_msg))
-            return False
     
+    @monitor_metrics("config_remove_key_listener", include_labels=True)
+    @with_error_handling(error_code="CONFIG_REMOVE_KEY_LISTENER_ERROR", default_return=False)
+    @with_logging(level="debug", include_args=True)
     def remove_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]) -> bool:
         """
         Remove listener for specific configuration item
@@ -578,18 +560,17 @@ class ConfigManager:
         Returns:
             Whether removal was successful
         """
-        try:
-            if key in self._key_listeners:
+        if key in self._key_listeners:
+            try:
                 self._key_listeners[key].remove(listener)
                 return True
-            return False
-        except ValueError:
-            return False
-        except Exception as e:
-            error_msg = f"Failed to remove configuration item listener: {e}"
-            handle_error(OCRConfigError(error_msg))
-            return False
+            except ValueError:
+                return False
+        return False
     
+    @monitor_metrics("config_validate_all", include_labels=True)
+    @with_error_handling(error_code="CONFIG_VALIDATE_ALL_ERROR", default_return=False)
+    @with_logging(level="info", measure_time=True)
     def validate_all_configs(self) -> bool:
         """
         Validate all configuration items
@@ -597,25 +578,18 @@ class ConfigManager:
         Returns:
             Whether all validations passed
         """
-        try:
-            for config_item in self._config_items.values():
-                if not config_item.validate(config_item.current_value):
-                    return False
-            return True
-        except Exception as e:
-            error_msg = f"Configuration validation exception: {e}"
-            handle_error(OCRConfigError(error_msg))
-            return False
+        for config_item in self._config_items.values():
+            if not config_item.validate(config_item.current_value):
+                return False
+        return True
     
+    @monitor_metrics("config_reset_all", include_labels=True)
+    @with_error_handling(error_code="CONFIG_RESET_ALL_ERROR")
+    @with_logging(level="info", measure_time=True)
     def reset_to_defaults(self) -> None:
         """重置所有配置项为默认值"""
-        try:
-            for config_item in self._config_items.values():
-                config_item.current_value = config_item.default_value
-        except Exception as e:
-            error_msg = f"Failed to reset configuration to default values: {e}"
-            handle_error(OCRConfigError(error_msg))
-            raise
+        for config_item in self._config_items.values():
+            config_item.current_value = config_item.default_value
 
     def reset_config(self, key: str) -> bool:
         """

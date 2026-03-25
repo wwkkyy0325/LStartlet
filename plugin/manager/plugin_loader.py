@@ -7,10 +7,12 @@ import importlib
 import importlib.util
 import os
 import sys
-from typing import Dict, Any, List, Optional, Type
+from typing import Dict, Any, List, Optional, Type, Tuple
 
+from core.logger import error
 from plugin.base.plugin_base import PluginBase
 from plugin.exceptions.plugin_exceptions import PluginLoadError
+from plugin.metadata import PluginMetadata
 
 
 class PluginLoader:
@@ -19,56 +21,149 @@ class PluginLoader:
     def __init__(self):
         self._loaded_modules: Dict[str, Any] = {}
     
-    def load_plugin_from_file(self, plugin_file_path: str) -> Optional[Type[PluginBase]]:
+    def load_plugin_from_wheel(self, wheel_path: str) -> Optional[Tuple[PluginMetadata, Type[PluginBase]]]:
         """
-        从文件加载插件类
+        从 wheel 文件加载插件
         
         Args:
-            plugin_file_path: 插件文件路径
+            wheel_path: wheel 文件路径
             
         Returns:
-            插件类或 None（如果加载失败）
+            (metadata, plugin_class) 元组或 None（如果加载失败）
         """
         try:
-            if not os.path.exists(plugin_file_path):
-                raise PluginLoadError("unknown", f"Plugin file does not exist: {plugin_file_path}")
+            if not os.path.exists(wheel_path):
+                raise PluginLoadError("unknown", f"Plugin wheel file does not exist: {wheel_path}")
             
-            # Get plugin module name
-            plugin_dir = os.path.dirname(plugin_file_path)
-            plugin_filename = os.path.basename(plugin_file_path)
-            if not plugin_filename.endswith('.py'):
-                raise PluginLoadError("unknown", f"Plugin file must be a .py file: {plugin_file_path}")
+            if not wheel_path.endswith('.whl'):
+                raise PluginLoadError("unknown", f"Plugin file must be a .whl file: {wheel_path}")
             
-            module_name = plugin_filename[:-3]  # Remove .py extension
+            # 解压 wheel 文件到临时目录
+            import tempfile
+            import zipfile
             
-            # Add plugin directory to Python path (if not already added)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with zipfile.ZipFile(wheel_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                
+                # 查找 plugin.json
+                plugin_json_path = None
+                for root, dirs, files in os.walk(temp_dir):
+                    if 'plugin.json' in files:
+                        plugin_json_path = os.path.join(root, 'plugin.json')
+                        break
+                
+                if not plugin_json_path:
+                    raise PluginLoadError("unknown", f"plugin.json not found in wheel file: {wheel_path}")
+                
+                # 加载元数据
+                metadata = PluginMetadata.from_file(plugin_json_path)
+                
+                # 获取入口点信息
+                module_name = metadata.entry_point['module']
+                class_name = metadata.entry_point['class']
+                
+                # 添加临时目录到 Python 路径
+                if temp_dir not in sys.path:
+                    sys.path.insert(0, temp_dir)
+                
+                # 导入模块
+                try:
+                    module = importlib.import_module(module_name)
+                except ImportError as e:
+                    raise PluginLoadError(metadata.namespace, f"Failed to import module {module_name}: {e}")
+                
+                # 获取插件类
+                if not hasattr(module, class_name):
+                    raise PluginLoadError(metadata.namespace, f"Class {class_name} not found in module {module_name}")
+                
+                plugin_class = getattr(module, class_name)
+                
+                # 验证插件类
+                if not isinstance(plugin_class, type) or not issubclass(plugin_class, PluginBase):
+                    raise PluginLoadError(metadata.namespace, f"{class_name} is not a valid PluginBase subclass")
+                
+                return metadata, plugin_class
+                
+        except Exception as e:
+            raise PluginLoadError("unknown", f"Failed to load plugin wheel: {wheel_path}, Error: {e}", e)
+    
+    def load_plugin_from_directory(self, plugin_dir: str) -> Dict[str, Tuple[PluginMetadata, Type[PluginBase]]]:
+        """
+        从目录加载所有插件（支持 wheel 文件和源码目录）
+        
+        Args:
+            plugin_dir: 插件目录路径
+            
+        Returns:
+            插件命名空间到 (metadata, plugin_class) 元组的映射
+        """
+        plugins: Dict[str, Tuple[PluginMetadata, Type[PluginBase]]] = {}
+        
+        if not os.path.exists(plugin_dir):
+            return plugins
+        
+        # 首先处理 wheel 文件
+        for filename in os.listdir(plugin_dir):
+            if filename.endswith('.whl'):
+                file_path = os.path.join(plugin_dir, filename)
+                try:
+                    result = self.load_plugin_from_wheel(file_path)
+                    if result is not None:
+                        metadata, plugin_class = result
+                        plugins[metadata.namespace] = (metadata, plugin_class)
+                except Exception as e:
+                    error(f"警告: 加载插件 wheel {filename} 失败: {e}")
+                    continue
+        
+        # 然后处理源码目录（包含 plugin.json 的目录）
+        for item in os.listdir(plugin_dir):
+            item_path = os.path.join(plugin_dir, item)
+            if os.path.isdir(item_path):
+                plugin_json_path = os.path.join(item_path, 'plugin.json')
+                if os.path.exists(plugin_json_path):
+                    try:
+                        metadata = PluginMetadata.from_file(plugin_json_path)
+                        plugin_class = self._load_plugin_from_source_dir(item_path, metadata)
+                        if plugin_class is not None:
+                            plugins[metadata.namespace] = (metadata, plugin_class)
+                    except Exception as e:
+                        error(f"警告: 加载插件源码目录 {item} 失败: {e}")
+                        continue
+        
+        return plugins
+    
+    def _load_plugin_from_source_dir(self, plugin_dir: str, metadata: PluginMetadata) -> Optional[Type[PluginBase]]:
+        """从源码目录加载插件"""
+        try:
+            # 添加插件目录到 Python 路径
             if plugin_dir not in sys.path:
                 sys.path.insert(0, plugin_dir)
             
-            # Check if module is already loaded
-            if module_name in self._loaded_modules:
-                return self._get_plugin_class_from_module(self._loaded_modules[module_name])
+            # 获取入口点信息
+            module_name = metadata.entry_point['module']
+            class_name = metadata.entry_point['class']
             
-            # Dynamically load module
-            spec = importlib.util.spec_from_file_location(module_name, plugin_file_path)
-            if spec is None or spec.loader is None:
-                raise PluginLoadError("unknown", f"Unable to load plugin module: {plugin_file_path}")
+            # 导入模块
+            try:
+                module = importlib.import_module(module_name)
+            except ImportError as e:
+                raise PluginLoadError(metadata.namespace, f"Failed to import module {module_name}: {e}")
             
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            # 获取插件类
+            if not hasattr(module, class_name):
+                raise PluginLoadError(metadata.namespace, f"Class {class_name} not found in module {module_name}")
             
-            # Cache loaded module
-            self._loaded_modules[module_name] = module
+            plugin_class = getattr(module, class_name)
             
-            # Get plugin class from module
-            plugin_class = self._get_plugin_class_from_module(module)
-            if plugin_class is None:
-                raise PluginLoadError("unknown", f"Plugin module {plugin_file_path} does not contain a valid plugin class")
+            # 验证插件类
+            if not isinstance(plugin_class, type) or not issubclass(plugin_class, PluginBase):
+                raise PluginLoadError(metadata.namespace, f"{class_name} is not a valid PluginBase subclass")
             
             return plugin_class
             
         except Exception as e:
-            raise PluginLoadError("unknown", f"Failed to load plugin file: {plugin_file_path}, Error: {e}", e)
+            raise PluginLoadError(metadata.namespace, f"Failed to load plugin from source directory: {plugin_dir}, Error: {e}", e)
     
     def _get_plugin_class_from_module(self, module: Any) -> Optional[Type[PluginBase]]:
         """
@@ -106,36 +201,3 @@ class PluginLoader:
         else:
             print(f"DEBUG: Single plugin class found: {plugin_classes[0].__name__}")
             return plugin_classes[0]
-    
-    def load_plugin_from_directory(self, plugin_dir: str) -> Dict[str, Type[PluginBase]]:
-        """
-        从目录加载所有插件
-        
-        Args:
-            plugin_dir: 插件目录路径
-            
-        Returns:
-            插件ID到插件类的映射
-        """
-        plugin_classes: Dict[str, Type[PluginBase]] = {}
-        
-        if not os.path.exists(plugin_dir):
-            return plugin_classes
-        
-        # Traverse all .py files in the directory
-        for filename in os.listdir(plugin_dir):
-            if filename.endswith('.py') and not filename.startswith('__'):
-                file_path = os.path.join(plugin_dir, filename)
-                try:
-                    plugin_class = self.load_plugin_from_file(file_path)
-                    if plugin_class is not None:
-                        # Directly use class name as plugin ID (temporary solution)
-                        # In a real project, plugins should define a static attribute or method to get plugin_id
-                        plugin_id = plugin_class.__name__
-                        plugin_classes[plugin_id] = plugin_class
-                except Exception as e:
-                    # Log error but continue loading other plugins
-                    print(f"警告: 加载插件 {filename} 失败: {e}")
-                    continue
-        
-        return plugin_classes

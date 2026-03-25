@@ -1,47 +1,53 @@
 """
-配置项数据类
-用于存储单个配置项的元数据和值
+配置项定义
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Type, Optional, Callable
 
 
-@dataclass
 class ConfigItem:
-    """配置项数据类"""
-    key: str
-    default_value: Any
-    current_value: Any = field(default_factory=lambda: None)
-    value_type: type = str
-    description: str = ""
-    validator: Optional[Callable[[Any], bool]] = None
+    """配置项类"""
     
-    def __post_init__(self):
-        """初始化后处理"""
-        if self.current_value is None:
-            self.current_value = self.default_value
+    def __init__(
+        self, 
+        key: str, 
+        default_value: Any, 
+        current_value: Any, 
+        value_type: Type[Any], 
+        description: str = "",
+        validator: Optional[Callable[[Any], bool]] = None
+    ):
+        """
+        初始化配置项
+        
+        Args:
+            key: 配置项键名
+            default_value: 配置项默认值
+            current_value: 配置项当前值
+            value_type: 配置项值类型
+            description: 配置项描述
+            validator: 验证函数
+        """
+        self.key = key
+        self.default_value = default_value
+        self.current_value = current_value
+        self.value_type = value_type
+        self.description = description
+        self.validator = validator
     
     def validate(self, value: Any) -> bool:
         """
-        验证配置值
+        验证配置项值
         
         Args:
             value: 要验证的值
             
         Returns:
-            是否验证通过
+            验证是否通过
         """
-        # 检查类型
-        if not isinstance(value, self.value_type):
-            return False
-        
-        # 执行自定义验证器
         if self.validator is not None:
             return self.validator(value)
-        
-        return True
-    
-    def reset_to_default(self) -> None:
-        """重置为默认值"""
-        self.current_value = self.default_value
+        # 基本类型检查
+        if self.value_type == type(None):
+            return value is None
+        return isinstance(value, self.value_type)

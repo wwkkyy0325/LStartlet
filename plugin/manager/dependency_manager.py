@@ -84,8 +84,11 @@ class PluginDependencyManager:
             是否满足依赖要求
         """
         try:
+            # 处理特殊包名映射（包名与导入名不同）
+            import_name = self._get_import_name(package_name)
+            
             # 尝试导入包
-            module = __import__(package_name)
+            module = __import__(import_name)
             
             # 如果版本规范是 "*"，只要模块存在就认为满足要求
             if version_spec == "*":
@@ -106,6 +109,26 @@ class PluginDependencyManager:
             warning(f"检查本地依赖 {package_name} 时出错: {e}")
             
         return False
+    
+    def _get_import_name(self, package_name: str) -> str:
+        """
+        获取包的实际导入名称（处理包名与导入名不同的情况）
+        
+        Args:
+            package_name: 包名
+            
+        Returns:
+            实际导入名称
+        """
+        # 特殊包名映射
+        package_mapping = {
+            'pillow': 'PIL',
+            'opencv-python': 'cv2',
+            'pyyaml': 'yaml',
+            'beautifulsoup4': 'bs4'
+        }
+        
+        return package_mapping.get(package_name.lower(), package_name)
     
     def _install_dependency(self, plugin_id: str, package_name: str, version_spec: str) -> bool:
         """
@@ -300,3 +323,16 @@ class PluginDependencyManager:
         for key in keys_to_remove:
             del self.installed_deps[key]
         self._save_installed_deps()
+    
+    def check_dependency_availability(self, package_name: str, version_spec: str) -> bool:
+        """
+        检查依赖是否可用（在主程序环境中）
+        
+        Args:
+            package_name: 包名
+            version_spec: 版本要求
+            
+        Returns:
+            依赖是否可用
+        """
+        return self._check_local_dependency(package_name, version_spec)

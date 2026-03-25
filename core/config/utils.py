@@ -4,7 +4,7 @@ import yaml
 import os
 from typing import Any, Dict, Union, Tuple, cast
 from core.path import ensure_directory_exists
-from core.decorators import with_error_handling, with_logging, monitor_metrics # type: ignore
+from core.decorators import with_error_handling, monitor_metrics # type: ignore
 
 
 class ConfigUtils:
