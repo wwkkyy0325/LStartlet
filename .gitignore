@@ -1,23 +1,9 @@
-# 配置文件
-config.*
-
-# 日志文件
-*.log
-logs/
-log/
-
-# 临时文件
-temp/
-*.tmp
-*.temp
-
-# Python缓存
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -33,12 +19,68 @@ var/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.*.swp
+.*.swo
 
-# 系统文件
-.DS_Store
+# Logs and databases
+*.log
+logs/
+log/
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.test-reports/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+
+# Build artifacts
+*.whl
+*.tar.gz
+
+# Configuration files
+# 用户配置文件 - 不应提交到版本控制
+config.yaml
+config.json
+user_config.yaml
+user_config.json
+*.local.yaml
+*.local.json
+.local/
+
+# 注意：系统配置文件（如 config.system.yaml, default.config 等）将被追踪
+# 如需忽略特定系统配置文件，请单独添加规则
+
+# 临时文件
+*.tmp
+*.temp
+temp/
+output/
+
+# Data directories
+data/
+
+# Plugin directories (individual plugins should be managed separately)
+plugin/
+
+# Windows specific
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional, Dict, Type
 from enum import Enum
 
 # 核心模块导入
-from core.error.exceptions import OCRError
+from core.error.exceptions import InfrastructureError
 from core.logger import info, error as log_error, warning
 
 
@@ -247,7 +247,7 @@ def require_permission(
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             current_level = _get_current_user_permission_level()
             if current_level.value < required_level.value:
-                raise OCRError(
+                raise InfrastructureError(
                     message=error_message,
                     error_code="PERMISSION_DENIED",
                     context={
@@ -271,7 +271,7 @@ def require_permission_async(
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             current_level = _get_current_user_permission_level()
             if current_level.value < required_level.value:
-                raise OCRError(
+                raise InfrastructureError(
                     message=error_message,
                     error_code="PERMISSION_DENIED",
                     context={

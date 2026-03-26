@@ -21,7 +21,7 @@ from core.decorators import (
     monitor_metrics_async, publish_event, validate_config, cached, plugin_component,
     plugin_event_handler, PermissionLevel, MetricsCollector
 )
-from core.error.exceptions import OCRError
+from core.error.exceptions import InfrastructureError
 
 
 class TestPermissionLevel(unittest.TestCase):
@@ -226,7 +226,7 @@ class TestPermissionDecorators(unittest.TestCase):
             def admin_func():
                 return "admin_access"
             
-            with self.assertRaises(OCRError) as context:
+            with self.assertRaises(InfrastructureError) as context:
                 admin_func()
             
             self.assertEqual(context.exception.error_code, "PERMISSION_DENIED")

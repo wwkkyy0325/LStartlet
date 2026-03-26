@@ -48,7 +48,7 @@ class ErrorFormatter:
             'traceback': ''.join(traceback.format_tb(exception.__traceback__)) if exception.__traceback__ else '',
         }
         
-        # 如果是自定义OCR异常，提取额外信息
+        # 如果是自定义异常，提取额外信息
         if hasattr(exception, 'error_code'):
             error_info['error_code'] = getattr(exception, 'error_code', None)
         

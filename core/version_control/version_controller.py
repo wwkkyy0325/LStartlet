@@ -12,7 +12,8 @@ from datetime import datetime
 from core.logger import info, error
 from core.config import get_config, register_config
 from core.path import get_project_root
-from ..cicd.deep_learning_manager import DeepLearningManager
+# 延迟导入以避免循环依赖
+# from ..cicd.deep_learning_manager import DeepLearningManager
 
 
 class ChangeAnalyzer:

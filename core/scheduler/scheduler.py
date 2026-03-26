@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, Callable, TypeVar, Awaitable, Union
 from core.logger import info, warning, error
 # 使用项目自定义错误处理系统
 from core.error import handle_error
-from core.error.exceptions import OCRProcessingError, OCRConfigError
+from core.error.exceptions import ProcessingError, ConfigError
 # 导入装饰器
 from core.decorators import with_error_handling, with_logging, monitor_metrics, monitor_metrics_async
 # 使用事件系统 - 只导入需要的事件
@@ -212,7 +212,7 @@ class Scheduler:
             }))
         except Exception as e:
             error_msg = f"更新调度器配置失败: {e}"
-            handle_error(OCRConfigError(error_msg, context=kwargs))
+            handle_error(ConfigError(error_msg, context=kwargs))
             raise
     
     @monitor_metrics("scheduler_submit_task", include_labels=True)
@@ -244,7 +244,7 @@ class Scheduler:
         try:
             if not self._is_running:
                 error_msg = "Scheduler is not running. Call start() first."
-                handle_error(OCRProcessingError(error_msg))
+                handle_error(ProcessingError(error_msg))
                 raise RuntimeError(error_msg)
             
             # Handle priority parameter
@@ -253,7 +253,7 @@ class Scheduler:
                     priority = TaskPriority[priority.upper()]
                 except KeyError:
                     error_msg = f"Invalid priority: {priority}"
-                    handle_error(OCRConfigError(error_msg))
+                    handle_error(ConfigError(error_msg))
                     raise ValueError(error_msg)
             
             # Use defaults from config
@@ -299,7 +299,7 @@ class Scheduler:
             return None
         except Exception as e:
             error_msg = f"提交任务失败: {e}"
-            handle_error(OCRProcessingError(error_msg, context={"task_id": task_id, "priority": priority}))
+            handle_error(ProcessingError(error_msg, context={"task_id": task_id, "priority": priority}))
             raise
 
     def get_status(self) -> Dict[str, Any]:
@@ -319,7 +319,7 @@ class Scheduler:
             }
         except Exception as e:
             error_msg = f"获取调度器状态失败: {e}"
-            handle_error(OCRProcessingError(error_msg))
+            handle_error(ProcessingError(error_msg))
             return {}
 
     @monitor_metrics_async("scheduler_run_loop", include_labels=True)
@@ -328,7 +328,7 @@ class Scheduler:
         try:
             if not self._is_running:
                 error_msg = "Scheduler is not running. Call start() first."
-                handle_error(OCRProcessingError(error_msg))
+                handle_error(ProcessingError(error_msg))
                 raise RuntimeError(error_msg)
             
             info("Starting scheduler main loop")
@@ -346,7 +346,7 @@ class Scheduler:
             info("Scheduler loop cancelled")
         except Exception as e:
             error_msg = f"Error in scheduler loop: {e}"
-            handle_error(OCRProcessingError(error_msg))
+            handle_error(ProcessingError(error_msg))
             raise
         finally:
             info("Scheduler loop ended")
@@ -358,5 +358,5 @@ class Scheduler:
             await self._task_dispatcher.wait_for_completion()
         except Exception as e:
             error_msg = f"等待任务完成失败: {e}"
-            handle_error(OCRProcessingError(error_msg))
+            handle_error(ProcessingError(error_msg))
             raise

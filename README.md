@@ -2,6 +2,10 @@
 
 A modular, high-cohesion, low-coupling infrastructure framework for Python applications.
 
+## Project Overview
+
+This project provides a comprehensive foundation for building robust Python applications with standardized components for configuration management, dependency injection, event handling, logging, and more. It's designed as a pure scaffolding framework without any domain-specific code.
+
 ## Core Components
 
 ### Configuration Management ([core.config](file:///f:/workspace-new/python/ocr/core/config/__init__.py#L0-L174))
@@ -9,6 +13,64 @@ A modular, high-cohesion, low-coupling infrastructure framework for Python appli
 - Type-safe configuration registration
 - Validation and change listeners
 - File-based persistence
+
+## Configuration Management
+
+This framework provides a comprehensive configuration management system with the following features:
+
+### Main Configuration Files
+
+1. **`system_config.yaml`** (Protected)
+   - Automatically maintained by the system
+   - Contains hardware detection results and environment information  
+   - **Users should NOT modify this file**
+   - Changes will be overwritten by system updates
+
+2. **`config.yaml`** (User-modifiable)
+   - Contains application settings that users can customize
+   - Will not be overwritten by system updates
+   - Supports all application configuration options
+
+### Plugin Configuration
+
+- Each plugin maintains its own `config.yaml` file in its directory
+- Plugin configurations are automatically wrapped in their namespace
+- Access plugin config using dotted notation: `plugin_namespace.setting_name`
+
+### Configuration Access Examples
+
+```python
+from core.config import get_config, get_config_manager
+
+# Get main application config
+app_name = get_config('app.name')
+debug_mode = get_config('app.debug_mode', False)
+
+# Get plugin config  
+plugin_setting = get_config('com.example.myplugin.settings.enabled')
+
+# Check if config is protected (from system_config)
+config_manager = get_config_manager()
+is_protected = config_manager.is_protected('system.platform')
+
+# List all plugin namespaces
+plugin_namespaces = config_manager.list_namespaces()
+```
+
+### Configuration Hierarchy
+
+The configuration loading follows this priority order:
+1. **System Config** (`system_config.yaml`) - Highest priority, protected
+2. **User Config** (`config.yaml`) - Medium priority, user-modifiable  
+3. **Plugin Config** (`plugin/*/config.yaml`) - Wrapped in namespace
+4. **Default Values** - Lowest priority, built-in defaults
+
+### Best Practices
+
+- Never modify `system_config.yaml` manually
+- Use `config.yaml` for all user customizations
+- Plugin developers should use unique namespace prefixes (e.g., `com.company.pluginname`)
+- Always provide default values when accessing configuration to handle missing keys gracefully
 
 ### Dependency Injection ([core.di](file:///f:/workspace-new/python/ocr/core/di/service_container.py#L0-L174))
 - Service container with singleton/transient/scoped lifetimes
@@ -364,14 +426,36 @@ python tests/run_tests.py
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.9 (optimized for Windows platform)
 - psutil
 - PyYAML
 
-Install dependencies:
+### Deep Learning Support
+
+This framework is designed to work seamlessly with popular deep learning libraries on Windows:
+
+- **PyTorch**: CPU and GPU support (CUDA)
+- **TensorFlow**: CPU and GPU support  
+- **PaddlePaddle**: Full Windows compatibility
+- **OpenCV**: Computer vision operations
+- **Hugging Face Transformers**: NLP models
+- **ONNX Runtime**: Model inference optimization
+
+### Installation
+
+Install core dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+For deep learning capabilities, uncomment and install the required libraries from `requirements.txt` based on your needs.
+
+### Windows-Specific Notes
+
+- Fully tested and optimized for Windows platforms
+- Includes proper handling for Windows file paths and process management
+- Compatible with Windows Subsystem for Linux (WSL) if needed
+- Supports both CPU and GPU acceleration for deep learning frameworks
 
 ## Contributing
 

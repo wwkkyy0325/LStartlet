@@ -1,13 +1,14 @@
 """事件总线
 实现事件的发布、订阅和分发功能"""
 
-from typing import Dict, List, Set, Callable, Type
+from typing import Dict, List, Set, Callable, Type, Optional
 from threading import Lock, RLock
 from collections import defaultdict
 import asyncio
 from .base_event import BaseEvent
 from .event_handler import EventHandler, LambdaEventHandler
 from .event_type_registry import EventTypeRegistry
+from .event_interceptor import EventInterceptor, LambdaEventInterceptor
 # 使用项目自定义日志管理器
 from core.logger import error
 from core.decorators import with_error_handling, monitor_metrics
@@ -33,6 +34,7 @@ class EventBus:
     def _initialize(self) -> None:
         """初始化事件总线"""
         self._handlers: Dict[str, List[EventHandler]] = defaultdict(list)
+        self._interceptors: List[EventInterceptor] = []
         self._type_registry = EventTypeRegistry()
         self._rw_lock = RLock()
         self._async_enabled = False
@@ -176,6 +178,85 @@ class EventBus:
             if event_type in self._handlers:
                 del self._handlers[event_type]
     
+    @with_error_handling(error_code="EVENT_ADD_INTERCEPTOR_ERROR", default_return=None)
+    @monitor_metrics("eventbus_add_interceptor", include_labels=True)
+    def add_interceptor(self, interceptor: EventInterceptor) -> None:
+        """
+        添加事件拦截器
+        
+        Args:
+            interceptor: 事件拦截器
+        """
+        with self._rw_lock:
+            self._interceptors.append(interceptor)
+    
+    @with_error_handling(error_code="EVENT_ADD_INTERCEPTOR_LAMBDA_ERROR", default_return=None)
+    @monitor_metrics("eventbus_add_interceptor_lambda", include_labels=True)
+    def add_interceptor_lambda(self, interceptor_func: Callable[[BaseEvent], Optional[BaseEvent]], name: str = "") -> None:
+        """
+        使用Lambda函数添加事件拦截器
+        
+        Args:
+            interceptor_func: 拦截函数
+            name: 拦截器名称
+        """
+        lambda_interceptor = LambdaEventInterceptor(interceptor_func, name)
+        self.add_interceptor(lambda_interceptor)
+    
+    @with_error_handling(error_code="EVENT_REMOVE_INTERCEPTOR_ERROR", default_return=False)
+    @monitor_metrics("eventbus_remove_interceptor", include_labels=True)
+    def remove_interceptor(self, interceptor: EventInterceptor) -> bool:
+        """
+        移除事件拦截器
+        
+        Args:
+            interceptor: 事件拦截器
+            
+        Returns:
+            bool: 是否成功移除
+        """
+        with self._rw_lock:
+            try:
+                self._interceptors.remove(interceptor)
+                return True
+            except ValueError:
+                return False
+    
+    @monitor_metrics("eventbus_clear_interceptors", include_labels=True)
+    def clear_interceptors(self) -> None:
+        """清除所有拦截器"""
+        with self._rw_lock:
+            self._interceptors.clear()
+    
+    def _apply_interceptors(self, event: BaseEvent) -> Optional[BaseEvent]:
+        """
+        应用所有拦截器到事件
+        
+        Args:
+            event: 原始事件
+            
+        Returns:
+            Optional[BaseEvent]: 处理后的事件，None表示事件被取消
+        """
+        current_event = event
+        
+        with self._rw_lock:
+            interceptors_to_apply = self._interceptors.copy()
+        
+        for interceptor in interceptors_to_apply:
+            if interceptor.enabled:
+                try:
+                    result = interceptor.intercept(current_event)
+                    if result is None:
+                        return None  # 拦截器取消了事件
+                    current_event = result
+                except Exception as e:
+                    # 记录拦截器异常，但不应影响其他拦截器
+                    error(f"事件拦截器执行失败: {e}", extra={"interceptor": interceptor.name})
+                    continue
+        
+        return current_event
+    
     @with_error_handling(error_code="EVENT_PUBLISH_ERROR", default_return=False)
     @monitor_metrics("eventbus_publish", include_labels=True)
     def publish(self, event: BaseEvent) -> bool:
@@ -191,23 +272,28 @@ class EventBus:
         # 确保事件类型已注册
         self._ensure_event_type_registered(event.event_type, type(event))
         
+        # 应用拦截器
+        processed_event = self._apply_interceptors(event)
+        if processed_event is None:
+            return False  # 事件被拦截器取消
+        
         handlers_to_execute = []
         with self._rw_lock:
-            if event.event_type in self._handlers:
+            if processed_event.event_type in self._handlers:
                 # 创建处理器副本以避免在执行过程中修改列表
-                handlers_to_execute = self._handlers[event.event_type].copy()
+                handlers_to_execute = self._handlers[processed_event.event_type].copy()
         
         handled = False
         for handler in handlers_to_execute:
-            if handler.enabled and handler.supports_event_type(event.event_type):
+            if handler.enabled and handler.supports_event_type(processed_event.event_type):
                 try:
-                    if handler.handle(event):
+                    if handler.handle(processed_event):
                         handled = True
-                        if event.handled:
+                        if processed_event.handled:
                             break  # 如果事件已被标记为已处理，停止处理
                 except Exception as e:
                     # 记录处理器异常，但不应影响其他处理器
-                    error(f"事件处理器执行失败: {e}", extra={"handler": handler.name, "event_type": event.event_type})
+                    error(f"事件处理器执行失败: {e}", extra={"handler": handler.name, "event_type": processed_event.event_type})
                     continue
         
         return handled
@@ -230,10 +316,15 @@ class EventBus:
         # 确保事件类型已注册
         self._ensure_event_type_registered(event.event_type, type(event))
         
+        # 应用拦截器
+        processed_event = self._apply_interceptors(event)
+        if processed_event is None:
+            return False  # 事件被拦截器取消
+        
         handlers_to_execute = []
         with self._rw_lock:
-            if event.event_type in self._handlers:
-                handlers_to_execute = self._handlers[event.event_type].copy()
+            if processed_event.event_type in self._handlers:
+                handlers_to_execute = self._handlers[processed_event.event_type].copy()
         
         if not handlers_to_execute:
             return False
@@ -241,9 +332,9 @@ class EventBus:
         # 所有处理器都在线程池中异步执行
         loop = asyncio.get_event_loop()
         tasks = [
-            loop.run_in_executor(None, self._execute_handler, handler, event)
+            loop.run_in_executor(None, self._execute_handler, handler, processed_event)
             for handler in handlers_to_execute
-            if handler.enabled and handler.supports_event_type(event.event_type)
+            if handler.enabled and handler.supports_event_type(processed_event.event_type)
         ]
         
         if not tasks:
@@ -297,6 +388,17 @@ class EventBus:
         """
         with self._rw_lock:
             return len(self._handlers.get(event_type, []))
+    
+    @monitor_metrics("eventbus_get_interceptors_count", include_labels=True)
+    def get_interceptors_count(self) -> int:
+        """
+        获取拦截器数量
+        
+        Returns:
+            int: 拦截器数量
+        """
+        with self._rw_lock:
+            return len(self._interceptors)
     
     @monitor_metrics("eventbus_get_all_subscribed_types", include_labels=True)
     def get_all_subscribed_types(self) -> Set[str]:

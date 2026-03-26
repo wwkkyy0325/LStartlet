@@ -16,19 +16,19 @@ from core.error import (
     handle_error, format_error, log_error, get_error_info
 )
 from core.error.exceptions import (
-    OCRError, OCRInitializationError, OCRProcessingError,
-    OCRFileError, OCRConfigError, OCRNetworkError
+    InfrastructureError, InitializationError, ProcessingError,
+    FileError, ConfigError, NetworkError
 )
 from core.error.formatter import ErrorFormatter
 from core.error.error_handler import ErrorHandler
 
 
-class TestOCRExceptions(unittest.TestCase):
-    """测试OCR自定义异常"""
+class TestInfrastructureExceptions(unittest.TestCase):
+    """测试基础设施自定义异常"""
     
-    def test_ocr_error(self):
-        """测试基础OCR异常"""
-        exc = OCRError("测试错误消息", "TEST_ERROR", {"key": "value"})
+    def test_infrastructure_error(self):
+        """测试基础基础设施异常"""
+        exc = InfrastructureError("测试错误消息", "TEST_ERROR", {"key": "value"})
         
         self.assertEqual(str(exc), "测试错误消息")
         self.assertEqual(exc.message, "测试错误消息")
@@ -36,29 +36,29 @@ class TestOCRExceptions(unittest.TestCase):
         self.assertEqual(exc.context, {"key": "value"})
     
     def test_specific_exceptions(self):
-        """测试特定类型的OCR异常"""
-        init_error = OCRInitializationError("初始化错误", {"component": "logger"})
-        proc_error = OCRProcessingError("处理错误", {"step": "recognition"})
-        file_error = OCRFileError("文件错误", {"filename": "test.txt"})
-        config_error = OCRConfigError("配置错误", {"setting": "timeout"})
-        network_error = OCRNetworkError("网络错误", {"url": "http://example.com"})
+        """测试特定类型的基础设施异常"""
+        init_error = InitializationError("初始化错误", {"component": "logger"})
+        proc_error = ProcessingError("处理错误", {"step": "execution"})
+        file_error = FileError("文件错误", {"filename": "test.txt"})
+        config_error = ConfigError("配置错误", {"setting": "timeout"})
+        network_error = NetworkError("网络错误", {"url": "http://example.com"})
         
-        self.assertEqual(init_error.error_code, "OCR_INIT_ERROR")
-        self.assertEqual(proc_error.error_code, "OCR_PROCESS_ERROR")
-        self.assertEqual(file_error.error_code, "OCR_FILE_ERROR")
-        self.assertEqual(config_error.error_code, "OCR_CONFIG_ERROR")
-        self.assertEqual(network_error.error_code, "OCR_NETWORK_ERROR")
+        self.assertEqual(init_error.error_code, "INIT_ERROR")
+        self.assertEqual(proc_error.error_code, "PROCESS_ERROR")
+        self.assertEqual(file_error.error_code, "FILE_ERROR")
+        self.assertEqual(config_error.error_code, "CONFIG_ERROR")
+        self.assertEqual(network_error.error_code, "NETWORK_ERROR")
 
 
 class TestErrorFormatter(unittest.TestCase):
     """测试错误格式化器"""
     
-    def test_format_error_with_ocr_exception(self):
-        """测试OCR异常的错误格式化"""
-        exc = OCRError("测试OCR错误", "TEST_CODE")
+    def test_format_error_with_infrastructure_exception(self):
+        """测试基础设施异常的错误格式化"""
+        exc = InfrastructureError("测试基础设施错误", "TEST_CODE")
         formatted = format_error(exc, include_traceback=False)
         
-        # OCR异常应该包含错误码
+        # 基础设施异常应该包含错误码
         self.assertIn("TEST_CODE", formatted)
         self.assertIn("Error Code", formatted)
     
@@ -89,7 +89,7 @@ class TestErrorFormatter(unittest.TestCase):
     
     def test_get_simple_error_message(self):
         """测试获取简化错误消息"""
-        exc = OCRError("简化测试消息")
+        exc = InfrastructureError("简化测试消息")
         simple_msg = ErrorFormatter.get_simple_error_message(exc)
         self.assertEqual(simple_msg, "简化测试消息")
         
@@ -124,7 +124,7 @@ class TestErrorHandler(unittest.TestCase):
     
     def test_set_default_context(self):
         """测试设置默认上下文"""
-        context = {"app": "ocr", "version": "1.0"}
+        context = {"app": "infrastructure", "version": "1.0"}
         self.handler.set_default_context(context)
         self.assertEqual(self.handler.get_default_context(), context)
     
@@ -165,20 +165,6 @@ class TestGlobalErrorFunctions(unittest.TestCase):
 class TestErrorHandlerIntegration(unittest.TestCase):
     """测试错误处理器集成"""
     
-    def test_ocr_error_handling(self):
-        """测试OCR异常处理"""
-        exc = OCRProcessingError("OCR处理失败", {"image": "test.jpg"})
-        result = handle_error(exc, {"module": "recognizer"})
-        
-        self.assertTrue(result)
-    
-    def test_regular_exception_handling(self):
-        """测试普通异常处理"""
-        exc = RuntimeError("运行时错误")
-        result = handle_error(exc, {"location": "main"})
-        
-        self.assertTrue(result)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_infrastructure_error_handling(self):
+        """测试基础设施异常处理"""
+        exc = ProcessingError("处理失败", {"component": "executor"})

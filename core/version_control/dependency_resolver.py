@@ -18,19 +18,40 @@ class DependencyResolver:
     def __init__(self, project_root: Optional[str] = None):
         self.project_root = project_root or get_project_root()
         
-        # 常见的深度学习和OCR相关包
+        # 常见的深度学习和计算机视觉相关包
         self.dl_packages: Set[str] = {
             'torch', 'torchvision', 'torchaudio',  # PyTorch
-            'tensorflow', 'tensorflow-gpu', 'keras',  # TensorFlow/Keras
-            'paddlepaddle', 'paddlehub', 'paddleslim', 'paddleocr',  # PaddlePaddle
-            'mxnet',  # MXNet
-            'onnx', 'onnxruntime',  # ONNX
-            'opencv-python', 'cv2',  # OpenCV
+            'tensorflow', 'tensorflow-cpu', 'tensorflow-gpu', 'keras',  # TensorFlow/Keras
+            'paddlepaddle', 'paddlehub', 'paddleslim',  # PaddlePaddle
+            'mxnet', 'mxnet-cu112',  # MXNet
+            'onnx', 'onnxruntime', 'onnxruntime-gpu',  # ONNX
+            'opencv-python', 'opencv-contrib-python', 'cv2',  # OpenCV
             'pillow', 'pil',  # PIL
-            'numpy', 'scipy', 'pandas',  # 数据处理
-            'scikit-image', 'skimage',  # Scikit-image
-            'tesseract', 'pytesseract',  # Tesseract
-            'easyocr', 'mmocr'  # OCR库
+            'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn',  # 数据处理和可视化
+            'scikit-learn', 'scikit-image', 'skimage',  # Scikit系列
+            # 移除了 Tesseract OCR 相关依赖，保持基础设施的纯粹性
+            'transformers', 'tokenizers',  # Hugging Face
+            'datasets', 'accelerate',  # Hugging Face utilities
+            'lightgbm', 'xgboost',  # Gradient boosting
+            'catboost',  # CatBoost
+            'dask', 'ray',  # Distributed computing
+            'faiss-cpu', 'faiss-gpu',  # Similarity search
+            'sentence-transformers',  # Sentence embeddings
+            'spacy', 'stanza',  # NLP libraries
+            'gensim',  # Topic modeling
+            'networkx', 'igraph',  # Graph libraries
+            'plotly', 'bokeh',  # Interactive visualization
+            'streamlit', 'gradio',  # Web UI frameworks
+            'fastapi', 'flask', 'django',  # Web frameworks
+            'requests', 'httpx', 'aiohttp',  # HTTP clients
+            'sqlalchemy', 'psycopg2', 'pymysql',  # Database connectors
+            'redis', 'pymongo', 'elasticsearch',  # NoSQL databases
+            'celery', 'rq',  # Task queues
+            'pytest', 'unittest', 'nose2',  # Testing frameworks
+            'black', 'flake8', 'mypy', 'isort',  # Code quality tools
+            'jupyter', 'ipython', 'notebook',  # Jupyter ecosystem
+            'virtualenv', 'pipenv', 'poetry',  # Environment management
+            'wheel', 'setuptools', 'build', 'twine'  # Packaging tools
         }
         
         # Python标准库模块

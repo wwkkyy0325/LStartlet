@@ -15,7 +15,7 @@ class PathManager:
     def _determine_project_root(self) -> str:
         """确定项目根目录"""
         # 尝试从环境变量获取
-        env_root = os.getenv('OCR_PROJECT_ROOT')
+        env_root = os.getenv('INFRA_PROJECT_ROOT')
         if env_root and os.path.exists(env_root):
             return PathUtils.normalize_path(env_root)
         
