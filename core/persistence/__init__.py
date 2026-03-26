@@ -6,6 +6,11 @@ from core.persistence.persistence_manager import PersistenceManager
 from core.di import ServiceContainer
 from core.di.service_descriptor import ServiceLifetime
 
+__all__ = [
+    'initialize_persistence_system',
+    'PersistenceManager'
+]
+
 
 def initialize_persistence_system(container: ServiceContainer, data_dir: str = "data") -> PersistenceManager:
     """

@@ -18,42 +18,6 @@ class DependencyResolver:
     def __init__(self, project_root: Optional[str] = None):
         self.project_root = project_root or get_project_root()
         
-        # 常见的深度学习和计算机视觉相关包
-        self.dl_packages: Set[str] = {
-            'torch', 'torchvision', 'torchaudio',  # PyTorch
-            'tensorflow', 'tensorflow-cpu', 'tensorflow-gpu', 'keras',  # TensorFlow/Keras
-            'paddlepaddle', 'paddlehub', 'paddleslim',  # PaddlePaddle
-            'mxnet', 'mxnet-cu112',  # MXNet
-            'onnx', 'onnxruntime', 'onnxruntime-gpu',  # ONNX
-            'opencv-python', 'opencv-contrib-python', 'cv2',  # OpenCV
-            'pillow', 'pil',  # PIL
-            'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn',  # 数据处理和可视化
-            'scikit-learn', 'scikit-image', 'skimage',  # Scikit系列
-            # 移除了 Tesseract OCR 相关依赖，保持基础设施的纯粹性
-            'transformers', 'tokenizers',  # Hugging Face
-            'datasets', 'accelerate',  # Hugging Face utilities
-            'lightgbm', 'xgboost',  # Gradient boosting
-            'catboost',  # CatBoost
-            'dask', 'ray',  # Distributed computing
-            'faiss-cpu', 'faiss-gpu',  # Similarity search
-            'sentence-transformers',  # Sentence embeddings
-            'spacy', 'stanza',  # NLP libraries
-            'gensim',  # Topic modeling
-            'networkx', 'igraph',  # Graph libraries
-            'plotly', 'bokeh',  # Interactive visualization
-            'streamlit', 'gradio',  # Web UI frameworks
-            'fastapi', 'flask', 'django',  # Web frameworks
-            'requests', 'httpx', 'aiohttp',  # HTTP clients
-            'sqlalchemy', 'psycopg2', 'pymysql',  # Database connectors
-            'redis', 'pymongo', 'elasticsearch',  # NoSQL databases
-            'celery', 'rq',  # Task queues
-            'pytest', 'unittest', 'nose2',  # Testing frameworks
-            'black', 'flake8', 'mypy', 'isort',  # Code quality tools
-            'jupyter', 'ipython', 'notebook',  # Jupyter ecosystem
-            'virtualenv', 'pipenv', 'poetry',  # Environment management
-            'wheel', 'setuptools', 'build', 'twine'  # Packaging tools
-        }
-        
         # Python标准库模块
         stdlib_names = getattr(sys, 'stdlib_module_names', None)
         if stdlib_names is not None:
@@ -63,43 +27,28 @@ class DependencyResolver:
     
     def _get_stdlib_modules(self) -> Set[str]:
         """获取Python标准库模块列表"""
+        stdlib_modules: Set[str] = set()
         try:
-            # 获取标准库路径
-            stdlib_path = os.path.dirname(os.__file__)
-            stdlib_modules: Set[str] = set()
+            # 尝试导入所有可能的标准库模块
+            for module_name in sys.builtin_module_names:
+                stdlib_modules.add(module_name)
             
-            for item in os.listdir(stdlib_path):
-                item_path = os.path.join(stdlib_path, item)
-                if os.path.isdir(item_path):
-                    if not item.startswith('__') and not item.endswith('.py'):
-                        stdlib_modules.add(item)
-                elif item.endswith('.py'):
-                    module_name = item[:-3]  # 移除.py后缀
-                    if not module_name.startswith('__'):
-                        stdlib_modules.add(module_name)
-            
-            # 添加一些常见的内置模块
-            stdlib_modules.update([
-                'builtins', 'sys', 'os', 'io', 'abc', 'atexit', 'errno', 
-                'gc', 'imp', 'marshal', 'posix', 'signal', 'sys', 
-                'thread', 'time', 'zipimport', 'zlib', '_thread', 'cmath'
-            ])
-            
-            return stdlib_modules
-        except Exception:
-            # 如果无法获取标准库列表，返回一个基本的集合
-            return {
-                'os', 'sys', 'json', 'math', 'random', 'datetime', 
-                'collections', 'itertools', 'functools', 'operator',
-                'pathlib', 'urllib', 'http', 'ssl', 'socket',
-                'argparse', 'logging', 'configparser', 'pickle',
-                'subprocess', 'threading', 'multiprocessing', 'queue',
-                're', 'string', 'textwrap', 'unicodedata', 'stringprep',
-                'struct', 'codecs', 'dataclasses', 'enum', 'typing',
-                'hashlib', 'hmac', 'copy', 'pprint', 'reprlib', 'inspect',
-                'py_compile', 'compileall', 'zipfile', 'tarfile', 'gzip',
-                'bz2', 'lzma', 'shutil', 'tempfile', 'glob', 'fnmatch'
+            # 添加常见的标准库模块
+            common_stdlib = {
+                'os', 'sys', 'pathlib', 'json', 'yaml', 're', 'datetime',
+                'collections', 'itertools', 'functools', 'typing', 'abc',
+                'logging', 'subprocess', 'threading', 'multiprocessing',
+                'unittest', 'pytest', 'argparse', 'configparser', 'shutil',
+                'tempfile', 'glob', 'fnmatch', 'hashlib', 'base64', 'uuid',
+                'inspect', 'ast', 'tokenize', 'dis', 'pickle', 'csv', 'xml',
+                'html', 'urllib', 'http', 'email', 'ssl', 'socket', 'select',
+                'asyncio', 'queue', 'heapq', 'bisect', 'copy', 'pprint', 'textwrap'
             }
+            stdlib_modules.update(common_stdlib)
+        except Exception as e:
+            warning(f"获取标准库模块时出错: {e}")
+        
+        return stdlib_modules
     
     def analyze_dependencies(self, directory: Optional[str] = None) -> Dict[str, Set[str]]:
         """
@@ -114,7 +63,6 @@ class DependencyResolver:
         directory = directory or self.project_root
         
         external_deps: Set[str] = set()
-        dl_deps: Set[str] = set()
         project_deps: Set[str] = set()
         
         for root, dirs, files in os.walk(directory):
@@ -133,8 +81,6 @@ class DependencyResolver:
                             
                             if main_package in self.stdlib_modules:
                                 continue  # 标准库模块
-                            elif main_package in self.dl_packages:
-                                dl_deps.add(main_package)
                             else:
                                 # 检查是否是项目内部模块
                                 project_module_path = os.path.join(self.project_root, *dep.split('.'))
@@ -147,11 +93,10 @@ class DependencyResolver:
                     except Exception as e:
                         warning(f"分析文件 {file_path} 时出错: {e}")
         
-        info(f"分析完成 - 外部依赖: {len(external_deps)}, 深度学习依赖: {len(dl_deps)}, 项目依赖: {len(project_deps)}")
+        info(f"分析完成 - 外部依赖: {len(external_deps)}, 项目依赖: {len(project_deps)}")
         
         return {
             'external': external_deps,
-            'deep_learning': dl_deps,
             'project': project_deps
         }
     
@@ -184,7 +129,7 @@ class DependencyResolver:
             外部依赖包名集合
         """
         analysis_result = self.analyze_dependencies()
-        return analysis_result['external'].union(analysis_result['deep_learning'])
+        return analysis_result['external']
     
     def generate_requirements_txt(self, output_file: str = "requirements.txt") -> bool:
         """
@@ -210,8 +155,7 @@ class DependencyResolver:
             # 获取项目依赖
             project_deps = self.analyze_dependencies()
             required_packages: Set[str] = (
-                project_deps['external'] | 
-                project_deps['deep_learning']
+                project_deps['external']
             )
             
             # 过滤出项目实际使用的包

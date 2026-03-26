@@ -16,7 +16,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/your-org/core-infrastructure-framework",
-    packages=find_packages(exclude=["tests*", "examples*"]),
+    packages=find_packages(exclude=["tests*", "test_reports*", "build*", "deployment*", "plugin.example_ocr_plugin", "plugin.example_ocr_plugin.*"]),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -30,17 +30,8 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.7, <3.12",
     install_requires=requirements,
-    extras_require={
-        "dev": [
-            "pytest>=6.0",
-            "pytest-cov>=2.0",
-            "black>=22.0",
-            "flake8>=4.0",
-            "mypy>=0.900",
-        ],
-    },
-    include_package_data=True,
     zip_safe=False,
+    include_package_data=True,
 )

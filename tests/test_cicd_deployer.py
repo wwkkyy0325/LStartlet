@@ -38,85 +38,72 @@ class TestDeployer(unittest.TestCase):
         self.assertEqual(deployer.deployment_history, [])
     
     @patch('core.cicd.deployer.Deployer._get_deployment_config')
-    @patch('core.cicd.deployer.Deployer._execute_deployment')
-    def test_deploy_success(self, mock_execute, mock_get_config):
+    def test_deploy_success(self, mock_get_config):
         """测试部署成功"""
-        # Mock 部署配置和执行
-        mock_get_config.return_value = {
-            "target_path": "/fake/target",
-            "backup_before_deploy": False,
-            "run_health_check": False,
-            "notify_on_deploy": False,
-            "model_path": "/fake/models"
-        }
-        mock_execute.return_value = True
+        deployer = Deployer()
         
-        deployer = Deployer(self.project_root)
-        result = deployer.deploy("dev", "/fake/artifact", False)
+        # 设置模拟对象
+        mock_get_config.return_value = {"host": "localhost", "port": 8080}
         
-        self.assertTrue(result)
-        mock_get_config.assert_called_with("dev")
-        mock_execute.assert_called_once()
+        with patch.object(deployer, '_execute_deployment') as mock_deploy:
+            mock_deploy.return_value = True
+            
+            result = deployer.deploy("dev", "/fake/artifact")
+            
+            self.assertTrue(result)
+            mock_get_config.assert_called_once_with("dev")
+            mock_deploy.assert_called_once_with("dev", "/fake/artifact", {"host": "localhost", "port": 8080})
     
     @patch('core.cicd.deployer.Deployer._get_deployment_config')
-    @patch('core.cicd.deployer.Deployer._execute_deployment')
-    def test_deploy_with_models(self, mock_execute, mock_get_config):
-        """测试包含模型文件的部署"""
-        # Mock 部署配置和执行
-        mock_get_config.return_value = {
-            "target_path": "/fake/target",
-            "backup_before_deploy": False,
-            "run_health_check": False,
-            "notify_on_deploy": False,
-            "model_path": "/fake/models"
-        }
-        mock_execute.return_value = True
-        
-        deployer = Deployer(self.project_root)
-        result = deployer.deploy("prod", "/fake/artifact", True)
-        
-        self.assertTrue(result)
-        mock_get_config.assert_called_with("prod")
-        mock_execute.assert_called_once()
-    
-    @patch('core.cicd.deployer.Deployer._get_deployment_config')
-    @patch('core.cicd.deployer.Deployer._execute_deployment', return_value=False)
-    def test_deploy_failure(self, mock_execute, mock_get_config):
+    def test_deploy_failure(self, mock_get_config):
         """测试部署失败"""
-        # Mock 部署配置
-        mock_get_config.return_value = {
-            "target_path": "/fake/target",
-            "backup_before_deploy": False,
-            "run_health_check": False,
-            "notify_on_deploy": False,
-            "model_path": "/fake/models"
-        }
+        deployer = Deployer()
         
-        deployer = Deployer(self.project_root)
-        result = deployer.deploy("dev", "/fake/artifact", False)
+        # 设置模拟对象
+        mock_get_config.return_value = {"host": "localhost", "port": 8080}
         
-        self.assertFalse(result)
-        mock_get_config.assert_called_with("dev")
-        mock_execute.assert_called_once()
+        with patch.object(deployer, '_execute_deployment') as mock_deploy:
+            mock_deploy.return_value = False
+            
+            result = deployer.deploy("dev", "/fake/artifact")
+            
+            self.assertFalse(result)
+            mock_get_config.assert_called_once_with("dev")
+            mock_deploy.assert_called_once_with("dev", "/fake/artifact", {"host": "localhost", "port": 8080})
     
     @patch('core.cicd.deployer.Deployer._get_deployment_config')
-    @patch('core.cicd.deployer.Deployer._execute_deployment', side_effect=Exception("Unexpected error"))
-    def test_deploy_exception(self, mock_execute, mock_get_config):
+    def test_deploy_with_models(self, mock_get_config):
+        """测试包含模型文件的部署"""
+        deployer = Deployer()
+        
+        # 设置模拟对象
+        mock_get_config.return_value = {"host": "localhost", "port": 8080}
+        
+        with patch.object(deployer, '_execute_deployment') as mock_deploy:
+            mock_deploy.return_value = True
+            
+            result = deployer.deploy("prod", "/fake/artifact")
+            
+            self.assertTrue(result)
+            mock_get_config.assert_called_once_with("prod")
+            mock_deploy.assert_called_once_with("prod", "/fake/artifact", {"host": "localhost", "port": 8080})
+    
+    @patch('core.cicd.deployer.Deployer._get_deployment_config')
+    def test_deploy_exception(self, mock_get_config):
         """测试部署异常"""
-        # Mock 部署配置
-        mock_get_config.return_value = {
-            "target_path": "/fake/target",
-            "backup_before_deploy": False,
-            "run_health_check": False,
-            "notify_on_deploy": False,
-            "model_path": "/fake/models"
-        }
+        deployer = Deployer()
         
-        deployer = Deployer(self.project_root)
-        result = deployer.deploy("dev", "/fake/artifact", False)
+        # 设置模拟对象
+        mock_get_config.return_value = {"host": "localhost", "port": 8080}
         
-        self.assertFalse(result)
-        mock_get_config.assert_called_with("dev")
+        with patch.object(deployer, '_execute_deployment') as mock_deploy:
+            mock_deploy.side_effect = Exception("Deployment failed")
+            
+            result = deployer.deploy("dev", "/fake/artifact")
+            
+            self.assertFalse(result)
+            mock_get_config.assert_called_once_with("dev")
+            mock_deploy.assert_called_once_with("dev", "/fake/artifact", {"host": "localhost", "port": 8080})
 
 
 if __name__ == '__main__':

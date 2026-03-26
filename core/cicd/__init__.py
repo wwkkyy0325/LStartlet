@@ -7,7 +7,6 @@ from .builder import Builder
 from .tester import Tester
 from .deployer import Deployer
 from .cicd_controller import CICDController
-from .deep_learning_manager import DeepLearningManager
 from .dependency_installer import DependencyInstaller
 
 __all__ = [
@@ -18,6 +17,5 @@ __all__ = [
     'Tester',
     'Deployer',
     'CICDController',
-    'DeepLearningManager',
     'DependencyInstaller'
 ]

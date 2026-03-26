@@ -4,6 +4,7 @@ import os # type: ignore
 from typing import Dict, Any, Optional # type: ignore
 from core.command.command_base import BaseCommand, CommandResult, CommandMetadata
 from core.decorators import require_permission, PermissionLevel, with_error_handling, with_logging
+from core.version_control.version_controller import VersionController
 
 
 class EchoCommand(BaseCommand):
@@ -102,12 +103,16 @@ class SystemInfoCommand(BaseCommand):
         
         detail_level = kwargs.get("detail_level", "basic")
         
+        # 使用 VersionController 获取真实版本
+        version_controller = VersionController()
+        current_version = version_controller.get_current_version()
+        
         if detail_level == "detailed":
             # 详细模式
             import psutil
             from typing import Any
             info: dict[str, Any] = {
-                "version": "1.0.0",
+                "version": current_version,
                 "platform": platform.system(),
                 "platform_version": platform.version(),
                 "platform_release": platform.release(),
@@ -122,7 +127,7 @@ class SystemInfoCommand(BaseCommand):
         else:
             # 基础模式
             info = {
-                "version": "1.0.0",
+                "version": current_version,
                 "platform": platform.system(),
                 "python_version": sys.version
             }

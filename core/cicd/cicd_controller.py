@@ -15,7 +15,6 @@ from .pipeline import Pipeline
 from .builder import Builder
 from .tester import Tester
 from .deployer import Deployer
-from .deep_learning_manager import DeepLearningManager
 
 
 class CICDController:
@@ -27,7 +26,6 @@ class CICDController:
         self.builder = Builder(self.project_root)
         self.tester = Tester(self.project_root)
         self.deployer = Deployer(self.project_root)
-        self.dl_manager = DeepLearningManager(self.project_root)
         
         # 导入系统检测模块
         try:
@@ -52,9 +50,6 @@ class CICDController:
         register_config("cicd.deploy.target_env", "staging", str, "部署目标环境")
         register_config("cicd.notify.on_failure", True, bool, "失败时是否发送通知")
         register_config("cicd.notify.on_success", False, bool, "成功时是否发送通知")
-        register_config("cicd.dl.validate_environment", True, bool, "是否验证深度学习环境兼容性")
-        register_config("cicd.dl.optimize_hardware", True, bool, "是否根据硬件优化配置")
-        register_config("cicd.dl.include_models", False, bool, "部署时是否包含模型文件")
         register_config("cicd.system.pre_deploy_detection", True, bool, "部署前是否进行系统检测")
         register_config("cicd.system.post_deploy_validation", True, bool, "部署后是否进行系统验证")
         register_config("cicd.dependencies.install_missing", True, bool, "是否自动安装缺失依赖")
@@ -94,21 +89,6 @@ class CICDController:
                 if not install_success:
                     warning("依赖安装失败，但仍继续部署")
             
-            # 针对深度学习项目进行环境验证
-            if get_config("cicd.dl.validate_environment", True):
-                is_compatible, issues = self.dl_manager.validate_environment_compatibility()
-                if not is_compatible:
-                    warning(f"环境兼容性检查发现问题: {', '.join(issues)}")
-                    # 根据配置决定是否继续
-                    if self._should_fail_on_dl_issues(issues):
-                        error("由于深度学习环境问题，终止流水线执行")
-                        self._send_notification(f"CI/CD流水线失败: {pipeline.name} - 环境不兼容", "failure")
-                        return False
-            
-            # 根据硬件优化配置
-            if get_config("cicd.dl.optimize_hardware", True):
-                self.dl_manager.optimize_for_hardware()
-            
             # 如果提供了版本标签，则创建标签
             if version_tag:
                 success = self.version_controller.create_tag(version_tag, f"Auto-build {version_tag}")
@@ -138,8 +118,7 @@ class CICDController:
             if deploy_target:
                 info(f"开始部署到: {deploy_target}")
                 
-                # 获取构建产物，根据配置决定是否包含模型
-                include_models = get_config("cicd.dl.include_models", False)
+                # 获取构建产物
                 artifacts_paths = self.builder.get_build_artifacts()
                 
                 # 如果有多个构件，选择第一个或合并路径
@@ -151,7 +130,6 @@ class CICDController:
                 deploy_success = self.deployer.deploy(
                     deploy_target, 
                     artifacts_path,
-                    include_models=include_models
                 )
                 
                 if not deploy_success:
@@ -260,20 +238,19 @@ class CICDController:
         info("开始执行测试阶段")
         return self.tester.run_tests(test_suite)
     
-    def run_deploy(self, target: str, artifacts_path: Optional[str] = None, include_models: bool = False) -> bool:
+    def run_deploy(self, target: str, artifacts_path: Optional[str] = None) -> bool:
         """
         仅运行部署阶段
         
         Args:
             target: 部署目标
             artifacts_path: 构件路径
-            include_models: 是否包含模型文件
             
         Returns:
             是否部署成功
         """
         info(f"开始部署到: {target}")
-        return self.deployer.deploy(target, artifacts_path, include_models=include_models)
+        return self.deployer.deploy(target, artifacts_path)
     
     def _send_notification(self, message: str, status: str) -> None:
         """
@@ -309,8 +286,7 @@ class CICDController:
             "pipeline_name": pipeline.name,
             "executed_at": datetime.now().isoformat(),
             "results": results,
-            "stages": [],
-            "dl_environment": self.dl_manager.detect_deep_learning_deps()
+            "stages": []
         }
         
         # 如果系统配置管理器可用，添加系统信息

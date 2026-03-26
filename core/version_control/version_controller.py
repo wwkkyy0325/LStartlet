@@ -12,8 +12,6 @@ from datetime import datetime
 from core.logger import info, error
 from core.config import get_config, register_config
 from core.path import get_project_root
-# 延迟导入以避免循环依赖
-# from ..cicd.deep_learning_manager import DeepLearningManager
 
 
 class ChangeAnalyzer:
@@ -79,27 +77,29 @@ class IncrementalPackageGenerator:
     def __init__(self, project_root: Optional[str] = None):
         self.project_root = project_root or get_project_root()
         self.analyzer = ChangeAnalyzer(project_root)
-        self.dl_manager = DeepLearningManager(project_root)
     
     def generate_incremental_package(self, 
                                   base_commit: str = "HEAD~1", 
                                   target_commit: str = "HEAD", 
-                                  output_dir: str = "./incremental_packages",
-                                  include_models: bool = False) -> Optional[str]:
+                                  output_dir: str = "./incremental_packages") -> Optional[str]:
         """
         生成增量包
         
         Args:
-            base_commit: 基础提交
-            target_commit: 目标提交
+            base_commit: 基准提交
+            target_commit: 目标提交  
             output_dir: 输出目录
-            include_models: 是否包含模型文件
             
         Returns:
-            生成的增量包路径，如果失败返回None
+            增量包路径，如果失败则返回None
         """
         try:
+            # 获取变更文件
             changes = self.analyzer.analyze_changes(base_commit, target_commit)
+            if not changes:
+                from core.logger import warning
+                warning("没有检测到文件变更，跳过增量包生成")
+                return None
             
             # 创建输出目录
             os.makedirs(output_dir, exist_ok=True)
@@ -111,11 +111,6 @@ class IncrementalPackageGenerator:
             
             # 准备要打包的文件
             files_to_pack = changes["added"] + changes["modified"]
-            
-            # 如果需要包含模型文件，添加模型文件
-            if include_models:
-                model_files = self.dl_manager.manage_model_versions()
-                files_to_pack.extend(list(model_files.values()))
             
             # 使用zip命令打包文件
             import zipfile
@@ -130,20 +125,15 @@ class IncrementalPackageGenerator:
                     "base_commit": base_commit,
                     "target_commit": target_commit,
                     "generated_at": datetime.now().isoformat(),
-                    "changes": changes,
-                    "includes_models": include_models
+                    "changes": changes
                 }
                 
                 # 写入变更记录到zip
                 zipf.writestr("changes.json", json.dumps(changes_record, indent=2, ensure_ascii=False))
-                
-                # 如果是深度学习项目，添加依赖信息
-                dl_deps = self.dl_manager.detect_deep_learning_deps()
-                if dl_deps:
-                    zipf.writestr("dl_dependencies.json", json.dumps(dl_deps, indent=2, ensure_ascii=False))
             
             info(f"增量包生成成功: {package_path}")
             return package_path
+            
         except Exception as e:
             error(f"生成增量包时出错: {e}")
             return None
@@ -156,12 +146,10 @@ class VersionController:
         self.project_root = project_root or get_project_root()
         self.change_analyzer = ChangeAnalyzer(project_root)
         self.incremental_generator = IncrementalPackageGenerator(project_root)
-        self.dl_manager = DeepLearningManager(project_root)
         
         # 注册版本控制器相关的配置
         register_config("version_control.output_dir", "./incremental_packages", str, "增量包输出目录")
         register_config("version_control.include_dependencies", True, bool, "是否包含依赖信息到增量包")
-        register_config("version_control.include_models", False, bool, "是否在增量包中包含模型文件")
         
     def get_current_version(self) -> str:
         """获取当前版本"""
@@ -197,8 +185,7 @@ class VersionController:
     def generate_incremental_package(self, 
                                    base_version: str, 
                                    target_version: str = "HEAD", 
-                                   include_dependencies: bool = True,
-                                   include_models: Optional[bool] = None) -> Optional[str]:
+                                   include_dependencies: bool = True) -> Optional[str]:
         """
         生成增量包
         
@@ -206,20 +193,16 @@ class VersionController:
             base_version: 基础版本
             target_version: 目标版本
             include_dependencies: 是否包含依赖信息
-            include_models: 是否包含模型文件，默认从配置获取
             
         Returns:
             生成的增量包路径
         """
         output_dir = get_config("version_control.output_dir", "./incremental_packages")
-        if include_models is None:
-            include_models = get_config("version_control.include_models", False)
         
         package_path = self.incremental_generator.generate_incremental_package(
             base_version, 
             target_version, 
-            output_dir,
-            bool(include_models)
+            output_dir
         )
         
         if package_path and include_dependencies:
@@ -277,10 +260,5 @@ class VersionController:
                                 dependencies[line] = "*"
             except Exception as e:
                 error(f"读取依赖文件时出错: {e}")
-        
-        # 添加深度学习依赖
-        dl_deps = self.dl_manager.detect_deep_learning_deps()
-        for name, version in dl_deps.items():
-            dependencies[name] = version
         
         return dependencies

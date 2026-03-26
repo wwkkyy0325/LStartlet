@@ -10,6 +10,17 @@ from .formatter import ErrorFormatter
 # 创建全局错误处理器实例
 error_handler: ErrorHandler = ErrorHandler()
 
+__all__ = [
+    'handle_error',
+    'format_error', 
+    'log_error',
+    'get_error_info',
+    'ErrorHandler',
+    'register_global_error_handler',
+    'ErrorFormatter',
+    'error_handler'
+]
+
 # 对外暴露的核心接口
 def handle_error(exception: Exception, context: Optional[Dict[str, Any]] = None) -> bool:
     """处理错误"""

@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
     
     steps:
     - uses: actions/checkout@v3
@@ -32,14 +32,9 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov black flake8 mypy
         
-        # Install common deep learning libraries for testing
+        # Install common libraries for testing
         pip install numpy scipy pandas
         pip install opencv-python pillow scikit-image
-        
-        # Optional: Install deep learning frameworks (commented out by default to reduce CI time)
-        # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-        # pip install tensorflow-cpu
-        # pip install paddlepaddle
     
     - name: Run tests
       run: |
@@ -54,6 +49,7 @@ jobs:
         flake8 .
     
     - name: Run type checking
+      if: matrix.python-version == '3.9'  # 只在3.9版本运行类型检查以节省时间
       run: |
         mypy core plugin tests --ignore-missing-imports
 

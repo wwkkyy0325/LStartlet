@@ -430,17 +430,6 @@ python tests/run_tests.py
 - psutil
 - PyYAML
 
-### Deep Learning Support
-
-This framework is designed to work seamlessly with popular deep learning libraries on Windows:
-
-- **PyTorch**: CPU and GPU support (CUDA)
-- **TensorFlow**: CPU and GPU support  
-- **PaddlePaddle**: Full Windows compatibility
-- **OpenCV**: Computer vision operations
-- **Hugging Face Transformers**: NLP models
-- **ONNX Runtime**: Model inference optimization
-
 ### Installation
 
 Install core dependencies:
@@ -448,14 +437,11 @@ Install core dependencies:
 pip install -r requirements.txt
 ```
 
-For deep learning capabilities, uncomment and install the required libraries from `requirements.txt` based on your needs.
-
 ### Windows-Specific Notes
 
 - Fully tested and optimized for Windows platforms
 - Includes proper handling for Windows file paths and process management
 - Compatible with Windows Subsystem for Linux (WSL) if needed
-- Supports both CPU and GPU acceleration for deep learning frameworks
 
 ## Contributing
 

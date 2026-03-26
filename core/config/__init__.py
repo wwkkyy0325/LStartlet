@@ -10,6 +10,26 @@ from .constants import DEFAULT_CONFIG_FILENAME
 # 延迟初始化的全局配置管理器实例
 _config_manager: Optional[ConfigManager] = None
 
+__all__ = [
+    'get_config_manager',
+    'get_config',
+    'set_config', 
+    'has_config',
+    'get_all_configs',
+    'register_config',
+    'add_config_listener',
+    'remove_config_listener',
+    'add_config_key_listener', 
+    'remove_config_key_listener',
+    'save_config',
+    'load_config',
+    'reset_all_configs',
+    'reset_config',
+    'ConfigManager',
+    'DEFAULT_CONFIG_FILENAME'
+]
+
+
 def get_config_manager() -> ConfigManager:
     """获取配置管理器实例（延迟初始化）"""
     global _config_manager
@@ -39,10 +59,11 @@ def register_config(
     get_config_manager().register_config(key, default_value, value_type, description)
 
 def add_config_listener(listener: Callable[[str, Any, Any], None]) -> None:
-    get_config_manager().add_listener(listener)
+    get_config_manager().add_global_listener(listener)
 
 def remove_config_listener(listener: Callable[[str, Any, Any], None]) -> bool:
-    return get_config_manager().remove_listener(listener)
+    get_config_manager().remove_global_listener(listener)
+    return True
 
 def add_config_key_listener(key: str, listener: Callable[[str, Any, Any], None]) -> None:
     get_config_manager().add_key_listener(key, listener)
@@ -61,5 +82,3 @@ def reset_all_configs() -> None:
 
 def reset_config(key: str) -> bool:
     return get_config_manager().reset_config(key)
-
-# 移除自动的默认配置注册，由 ConfigManager 在初始化时统一处理

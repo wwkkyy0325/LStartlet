@@ -1,0 +1,17 @@
+include README.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+
+recursive-include core *.py
+
+# 包含插件核心文件
+recursive-include plugin *.py
+recursive-include plugin *.json
+
+# 排除特定目录
+prune tests
+prune test_reports  
+prune build
+prune deployment
+prune plugin/example_ocr_plugin

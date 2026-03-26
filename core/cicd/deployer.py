@@ -21,14 +21,13 @@ class Deployer:
         self.project_root = project_root or get_project_root()
         self.deployment_history: List[Dict[str, Any]] = []
     
-    def deploy(self, target_env: str, artifacts_path: Optional[str] = None, include_models: Optional[bool] = None) -> bool:
+    def deploy(self, target_env: str, artifacts_path: Optional[str] = None) -> bool:
         """
         执行部署
         
         Args:
             target_env: 目标环境 (dev, staging, prod)
             artifacts_path: 构件路径
-            include_models: 是否包含模型文件
             
         Returns:
             是否部署成功
@@ -52,14 +51,14 @@ class Deployer:
                 return False
             
             # 执行部署
-            success = self._execute_deployment(target_env, artifacts_path, deployment_config, include_models)
+            success = self._execute_deployment(target_env, artifacts_path, deployment_config)
             
             if success:
                 # 记录部署历史
-                self._record_deployment(target_env, artifacts_path, success, include_models)
+                self._record_deployment(target_env, artifacts_path, success)
                 info(f"部署到 {target_env} 成功")
             else:
-                self._record_deployment(target_env, artifacts_path, success, include_models)
+                self._record_deployment(target_env, artifacts_path, success)
                 error(f"部署到 {target_env} 失败")
             
             return success
@@ -111,8 +110,7 @@ class Deployer:
                 error(f"未找到环境 {target_env} 的部署配置")
                 return False
             
-            include_models = rollback_deployment.get('include_models', False)
-            success = self._execute_deployment(target_env, rollback_artifact, deployment_config, include_models)
+            success = self._execute_deployment(target_env, rollback_artifact, deployment_config)
             
             if success:
                 # 记录回滚操作
@@ -206,7 +204,7 @@ class Deployer:
         artifacts.sort(reverse=True)
         return artifacts[0][1]
     
-    def _execute_deployment(self, target_env: str, artifact_path: str, config: Dict[str, Any], include_models: Optional[bool] = None) -> bool:
+    def _execute_deployment(self, target_env: str, artifact_path: str, config: Dict[str, Any]) -> bool:
         """执行实际部署"""
         info(f"开始部署构件: {artifact_path} 到环境: {target_env}")
         
@@ -243,8 +241,8 @@ class Deployer:
                 # 假设是目录，直接复制
                 shutil.copytree(artifact_path, deploy_dir)
             
-            # 如果需要部署模型文件
-            if include_models is True or (include_models is None and target_env in ['prod', 'staging']):
+            # 根据目标环境自动判断是否需要部署模型文件
+            if target_env in ['prod', 'staging']:
                 model_path = config.get("model_path", f"/var/models/{target_env}")
                 self._deploy_models(deploy_dir, model_path)
             
@@ -397,15 +395,14 @@ class Deployer:
         
         # TODO: 实现具体的通知发送逻辑（如邮件、Webhook等）
     
-    def _record_deployment(self, target_env: str, artifact_path: str, success: bool, include_models: Optional[bool] = None) -> None:
+    def _record_deployment(self, target_env: str, artifact_path: str, success: bool) -> None:
         """记录部署历史"""
         record: Dict[str, Any] = {
             "environment": target_env,
             "artifact_path": artifact_path,
             "version": os.path.basename(artifact_path).split('_')[1] if '_' in os.path.basename(artifact_path) else "unknown",
             "deployed_at": datetime.now().isoformat(),
-            "success": success,
-            "include_models": include_models or False
+            "success": success
         }
         
         self.deployment_history.append(record)

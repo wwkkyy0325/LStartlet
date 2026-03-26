@@ -35,8 +35,7 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_controller_initialization(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+    def test_controller_initialization(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试控制器初始化"""
         controller = CICDController(self.project_root)
         
@@ -45,7 +44,6 @@ class TestCICDController(unittest.TestCase):
         mock_builder.assert_called_once_with(self.project_root)
         mock_tester.assert_called_once_with(self.project_root)
         mock_deployer.assert_called_once_with(self.project_root)
-        mock_dl_manager.assert_called_once_with(self.project_root)
         
         # 验证配置项被正确注册
         from core.config import has_config
@@ -57,8 +55,7 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_run_pipeline_success(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+    def test_run_pipeline_success(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试成功运行流水线"""
         controller = CICDController(self.project_root)
         
@@ -66,9 +63,7 @@ class TestCICDController(unittest.TestCase):
         mock_version_controller.return_value.create_tag.return_value = True
         mock_builder.return_value.get_build_artifacts.return_value = ["./build/artifact.zip"]
         mock_deployer.return_value.deploy.return_value = True
-        # Mock DeepLearningManager 的 validate_environment_compatibility 方法
-        mock_dl_manager.return_value.validate_environment_compatibility.return_value = (True, [])
-        
+
         # 创建测试流水线
         step = Step("test_step", lambda: True)
         stage = Stage("test_stage")
@@ -87,16 +82,14 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_run_pipeline_failure_in_step(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+
+    def test_run_pipeline_failure_in_step(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试流水线步骤执行失败（抛出异常）"""
         controller = CICDController(self.project_root)
         
         # 设置版本控制器成功
         mock_version_controller.return_value.create_tag.return_value = True
-        # Mock DeepLearningManager 的 validate_environment_compatibility 方法
-        mock_dl_manager.return_value.validate_environment_compatibility.return_value = (True, [])
-        
+
         # 创建抛出异常的步骤
         def failing_step():
             raise RuntimeError("Step failed")
@@ -118,16 +111,12 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_run_pipeline_version_tag_failure(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+    def test_run_pipeline_version_tag_failure(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试版本标签创建失败"""
         controller = CICDController(self.project_root)
         
         # 设置版本控制器失败
         mock_version_controller.return_value.create_tag.return_value = False
-        # Mock DeepLearningManager 的 validate_environment_compatibility 方法
-        mock_dl_manager.return_value.validate_environment_compatibility.return_value = (True, [])
-        
         step = Step("test_step", lambda: True)
         stage = Stage("test_stage")
         stage.add_step(step)
@@ -145,8 +134,7 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_run_build(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+    def test_run_build(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试仅运行构建阶段"""
         controller = CICDController(self.project_root)
         
@@ -162,8 +150,7 @@ class TestCICDController(unittest.TestCase):
     @patch('core.cicd.cicd_controller.Builder')
     @patch('core.cicd.cicd_controller.Tester')
     @patch('core.cicd.cicd_controller.Deployer')
-    @patch('core.cicd.cicd_controller.DeepLearningManager')
-    def test_run_tests(self, mock_dl_manager, mock_deployer, mock_tester, mock_builder, mock_version_controller):
+    def test_run_tests(self, mock_deployer, mock_tester, mock_builder, mock_version_controller):
         """测试运行测试"""
         controller = CICDController(self.project_root)
         

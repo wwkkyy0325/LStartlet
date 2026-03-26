@@ -5,12 +5,40 @@ from .level import LogLevel
 from .handler import ConsoleHandler, RotatingFileHandler
 import atexit
 import os
-# 导入路径管理器
-from core.path import get_project_root, join_paths
 
 
 # 全局多进程logger管理器
 _logger_manager: Optional[MultiProcessLogger] = None
+
+
+def _get_project_root() -> str:
+    """获取项目根目录"""
+    # 使用当前文件的路径向上查找
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # core/logger/ -> core/ -> project root
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    return project_root
+
+
+def _join_paths(base_path: str, *paths: str) -> str:
+    """连接路径"""
+    return os.path.join(base_path, *paths)
+
+
+__all__ = [
+    'debug',
+    'info', 
+    'warning',
+    'error',
+    'critical',
+    'configure_logger',
+    'set_process_type',
+    'LogLevel',
+    'ConsoleHandler',
+    'RotatingFileHandler',
+    'MultiProcessLogger',
+    'LoggerCore'
+]
 
 
 def _get_logger_manager() -> MultiProcessLogger:
@@ -99,7 +127,7 @@ def configure_logger(
     
     # 如果没有指定日志目录，使用项目根目录下的logs目录
     if log_dir is None:
-        log_dir = join_paths(get_project_root(), 'logs')
+        log_dir = _join_paths(_get_project_root(), 'logs')
     
     if process_type is None:
         # 配置所有进程类型
@@ -122,7 +150,7 @@ def configure_logger(
         
         # 添加文件处理器
         if log_dir:
-            log_path = join_paths(log_dir, "app.log")
+            log_path = _join_paths(log_dir, "app.log")
             file_handler = RotatingFileHandler(
                 filename=log_path,
                 process_type=process_type,
