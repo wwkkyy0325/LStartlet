@@ -16,9 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.path import (
     get_project_root, get_core_path, get_logger_path, get_error_path,
-    get_data_path, get_config_path, get_output_path, get_logs_path,
+    get_data_path, get_config_path, get_logs_path,
     join_paths, normalize_path, is_valid_path, ensure_directory_exists,
-    PATH_CONSTANTS
+    set_project_root, path_manager, PathManager, PathUtils,
+    PATH_CONSTANTS, PROJECT_ROOT, CORE_PATH
 )
 from core.path.path_manager import PathManager
 from core.path.constants import PATH_CONSTANTS as CONSTANTS
@@ -28,16 +29,33 @@ from core.path.utils import PathUtils
 class TestPathConstants(unittest.TestCase):
     """测试路径常量"""
     
-    def test_constants_exist(self):
-        """测试路径常量存在"""
-        self.assertIn('PROJECT_ROOT', CONSTANTS)
-        self.assertIn('CORE_PATH', CONSTANTS)
-        self.assertIn('LOGGER_PATH', CONSTANTS)
-        self.assertIn('ERROR_PATH', CONSTANTS)
-        self.assertIn('DATA_PATH', CONSTANTS)
-        self.assertIn('CONFIG_PATH', CONSTANTS)
-        self.assertIn('OUTPUT_PATH', CONSTANTS)
-        self.assertIn('LOGS_PATH', CONSTANTS)
+    def setUp(self):
+        """测试前准备"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.original_project_root = os.environ.get('INFRA_PROJECT_ROOT')
+        
+    def tearDown(self):
+        """测试后清理"""
+        # 恢复原始环境变量
+        if self.original_project_root is not None:
+            os.environ['INFRA_PROJECT_ROOT'] = self.original_project_root
+        elif 'INFRA_PROJECT_ROOT' in os.environ:
+            del os.environ['INFRA_PROJECT_ROOT']
+        
+        # 清理临时目录
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
+    def test_constants_existence(self):
+        """测试常量存在性"""
+        required_constants = [
+            'PROJECT_ROOT', 'CORE_PATH', 'LOGGER_PATH', 'ERROR_PATH',
+            'DATA_PATH', 'CONFIG_PATH', 'LOGS_PATH'
+        ]
+        for const in required_constants:
+            self.assertIn(const, CONSTANTS)
+            self.assertIsInstance(CONSTANTS[const], str)
+            self.assertTrue(CONSTANTS[const])
 
 
 class TestPathUtils(unittest.TestCase):
@@ -106,6 +124,23 @@ class TestPathUtils(unittest.TestCase):
 class TestPathManager(unittest.TestCase):
     """测试路径管理器 - 简化测试避免全局状态干扰"""
     
+    def setUp(self):
+        """测试前准备"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.original_project_root = os.environ.get('INFRA_PROJECT_ROOT')
+        
+    def tearDown(self):
+        """测试后清理"""
+        # 恢复原始环境变量
+        if self.original_project_root is not None:
+            os.environ['INFRA_PROJECT_ROOT'] = self.original_project_root
+        elif 'INFRA_PROJECT_ROOT' in os.environ:
+            del os.environ['INFRA_PROJECT_ROOT']
+        
+        # 清理临时目录
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
     def test_path_manager_creation(self):
         """测试路径管理器创建"""
         manager = PathManager()
@@ -116,18 +151,47 @@ class TestPathManager(unittest.TestCase):
         self.assertIsInstance(project_root, str)
         self.assertTrue(project_root)
     
-    def test_get_all_paths(self):
-        """测试获取所有路径"""
+    def test_set_project_root(self):
+        """测试设置项目根目录"""
         manager = PathManager()
-        all_paths = manager.get_all_paths()
+        original_root = manager.get_project_root()
         
-        self.assertIsInstance(all_paths, dict)
-        self.assertIn('PROJECT_ROOT', all_paths)
-        self.assertIn('CORE_PATH', all_paths)
-
-
+        # 设置新的项目根目录
+        new_root = self.temp_dir
+        manager.set_project_root(new_root)
+        
+        # 验证根目录已更改
+        self.assertEqual(manager.get_project_root(), new_root)
+        
+        # 验证相关路径已更新
+        self.assertTrue(manager.get_data_path().startswith(new_root))
+        self.assertTrue(manager.get_config_path().startswith(new_root))
+        self.assertTrue(manager.get_logs_path().startswith(new_root))
+        
+        # 验证目录已自动创建
+        self.assertTrue(os.path.exists(manager.get_data_path()))
+        self.assertTrue(os.path.exists(manager.get_config_path()))
+        self.assertTrue(os.path.exists(manager.get_logs_path()))
+    
 class TestGlobalPathFunctions(unittest.TestCase):
     """测试全局路径函数"""
+    
+    def setUp(self):
+        """测试前准备"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.original_project_root = os.environ.get('INFRA_PROJECT_ROOT')
+        
+    def tearDown(self):
+        """测试后清理"""
+        # 恢复原始环境变量
+        if self.original_project_root is not None:
+            os.environ['INFRA_PROJECT_ROOT'] = self.original_project_root
+        elif 'INFRA_PROJECT_ROOT' in os.environ:
+            del os.environ['INFRA_PROJECT_ROOT']
+        
+        # 清理临时目录
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
     
     def test_global_functions(self):
         """测试全局路径函数"""
@@ -138,7 +202,6 @@ class TestGlobalPathFunctions(unittest.TestCase):
         error_path = get_error_path()
         data_path = get_data_path()
         config_path = get_config_path()
-        output_path = get_output_path()
         logs_path = get_logs_path()
         
         # 验证返回值是字符串且不为空
@@ -154,13 +217,29 @@ class TestGlobalPathFunctions(unittest.TestCase):
         self.assertTrue(data_path)
         self.assertIsInstance(config_path, str)
         self.assertTrue(config_path)
-        self.assertIsInstance(output_path, str)
-        self.assertTrue(output_path)
         self.assertIsInstance(logs_path, str)
         self.assertTrue(logs_path)
+    
+    def test_set_project_root_function(self):
+        """测试全局设置项目根目录函数"""
+        original_root = get_project_root()
         
-        # 验证路径存在或可以创建
-        self.assertTrue(os.path.exists(project_root) or os.path.dirname(project_root))
+        # 设置新的项目根目录
+        new_root = self.temp_dir
+        set_project_root(new_root)
+        
+        # 验证根目录已更改
+        self.assertEqual(get_project_root(), new_root)
+        
+        # 验证相关路径已更新
+        self.assertTrue(get_data_path().startswith(new_root))
+        self.assertTrue(get_config_path().startswith(new_root))
+        self.assertTrue(get_logs_path().startswith(new_root))
+        
+        # 验证目录已自动创建
+        self.assertTrue(os.path.exists(get_data_path()))
+        self.assertTrue(os.path.exists(get_config_path()))
+        self.assertTrue(os.path.exists(get_logs_path()))
     
     def test_global_constants(self):
         """测试全局常量"""

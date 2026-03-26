@@ -10,17 +10,17 @@ from typing import Optional
 
 __all__ = [
     'get_project_root',
-    'get_core_path',
+    'get_core_path', 
     'get_logger_path',
     'get_error_path',
     'get_data_path',
     'get_config_path',
-    'get_output_path',
     'get_logs_path',
     'join_paths',
     'normalize_path',
     'is_valid_path',
     'ensure_directory_exists',
+    'set_project_root',
     'path_manager',
     'PathManager',
     'PathUtils',
@@ -36,6 +36,20 @@ path_manager: PathManager = PathManager()
 def get_project_root() -> str:
     """获取项目根目录"""
     return path_manager.get_project_root()
+
+def set_project_root(root_path: str) -> None:
+    """设置项目根目录
+    
+    Args:
+        root_path: 项目根目录路径
+        
+    Usage:
+        # 在用户的main.py中调用
+        from core.path import set_project_root
+        import os
+        set_project_root(os.path.dirname(os.path.abspath(__file__)))
+    """
+    path_manager.set_project_root(root_path)
 
 def get_core_path() -> str:
     """获取 core 模块路径"""
@@ -56,10 +70,6 @@ def get_data_path() -> str:
 def get_config_path() -> str:
     """获取配置文件目录路径"""
     return path_manager.get_config_path()
-
-def get_output_path() -> str:
-    """获取输出目录路径"""
-    return path_manager.get_output_path()
 
 def get_logs_path() -> str:
     """获取日志目录路径"""

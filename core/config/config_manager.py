@@ -49,9 +49,7 @@ class ConfigManager:
                 self._flatten_and_merge_config(user_config, source='user', protected=False)
                 info(f"用户配置已从 {self._user_config_path} 加载")
         
-        # 3. 注册系统默认配置作为兜底
-        self._register_system_defaults()
-    
+
     def _load_yaml_config(self, file_path: str) -> Optional[Dict[str, Any]]:
         """安全加载YAML配置文件"""
         try:
@@ -131,28 +129,6 @@ class ConfigManager:
         """检查配置项是否受保护"""
         return key in self._protected_keys
     
-    def _register_system_defaults(self):
-        """注册系统默认配置项"""
-        defaults = {
-            'app_name': 'Infrastructure Framework',
-            'debug_mode': False,
-            'log_level': 'DEBUG',
-            'log_console_enabled': True,
-            'log_file_enabled': True,
-            'log_max_size_mb': 100,
-            'log_backup_count': 7,
-            'data_dir': 'data',
-            'output_dir': 'output',
-            'temp_dir': 'temp',
-            'auto_save_config': True
-        }
-        
-        # 只注册不存在的配置项，标记为system来源（但不受保护，允许用户修改）
-        for key, value in defaults.items():
-            if key not in self._config:
-                self._config[key] = value
-                self._config_sources[key] = 'system'
-    
     # ==================== 公共接口方法 ====================
     
     def get_config(self, key: str, default: Any = None) -> Any:
@@ -192,7 +168,7 @@ class ConfigManager:
             error(f"无法重置受保护的配置项: {key}")
             return False
         
-        # 如果是系统默认配置项，重置到默认值
+        # 如果是系统默认配置项，重置到默认值（仅技术性配置）
         system_defaults = {
             'debug_mode': False,
             'log_level': 'DEBUG',

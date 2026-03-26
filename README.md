@@ -1,4 +1,4 @@
-# Core Infrastructure Framework
+# LStartlet
 
 A modular, high-cohesion, low-coupling infrastructure framework for Python applications.
 

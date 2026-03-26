@@ -23,7 +23,6 @@ PATH_CONSTANTS: Dict[str, str] = {
     'ERROR_PATH': str(Path(_get_project_root()) / 'core' / 'error'),
     'DATA_PATH': str(Path(_get_project_root()) / 'data'),
     'CONFIG_PATH': str(Path(_get_project_root()) / 'config'),
-    'OUTPUT_PATH': str(Path(_get_project_root()) / 'output'),
     'LOGS_PATH': str(Path(_get_project_root()) / 'logs'),
     'SRC_PATH': str(Path(_get_project_root()) / 'src'),
     'TESTS_PATH': str(Path(_get_project_root()) / 'tests'),
@@ -33,6 +32,5 @@ PATH_CONSTANTS: Dict[str, str] = {
 DEFAULT_DIRECTORIES = [
     PATH_CONSTANTS['DATA_PATH'],
     PATH_CONSTANTS['CONFIG_PATH'],
-    PATH_CONSTANTS['OUTPUT_PATH'],
     PATH_CONSTANTS['LOGS_PATH'],
 ]
