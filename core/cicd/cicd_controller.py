@@ -4,7 +4,7 @@ CI/CD 控制器 - 管理整个持续集成和持续部署流程
 
 import os
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime
 
 from core.logger import info, warning, error
@@ -17,8 +17,16 @@ from .tester import Tester
 from .deployer import Deployer
 
 
+if TYPE_CHECKING:
+    from core.system.config_manager import SystemConfigManager
+    from core.cicd.dependency_installer import DependencyInstaller
+
+
 class CICDController:
     """CI/CD 控制器主类"""
+    
+    system_config_manager: Optional['SystemConfigManager']
+    dependency_installer: Optional['DependencyInstaller']
 
     def __init__(self, project_root: Optional[str] = None):
         self.project_root = project_root or get_project_root()

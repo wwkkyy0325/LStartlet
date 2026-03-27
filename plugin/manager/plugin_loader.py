@@ -134,7 +134,8 @@ class PluginLoader:
                     result = self.load_plugin_from_wheel(file_path)
                     if result is not None:
                         metadata, plugin_class = result
-                        plugins[metadata.namespace] = (metadata, plugin_class)
+                        wheel_plugin_class: Type[PluginBase] = plugin_class
+                        plugins[metadata.namespace] = (metadata, wheel_plugin_class)
                 except Exception as e:
                     error(f"警告: 加载插件 wheel {filename} 失败: {e}")
                     continue
@@ -147,11 +148,12 @@ class PluginLoader:
                 if os.path.exists(plugin_json_path):
                     try:
                         metadata = PluginMetadata.from_file(plugin_json_path)
-                        plugin_class = self._load_plugin_from_source_dir(
+                        source_plugin_class: Optional[Type[PluginBase]] = self._load_plugin_from_source_dir(
                             item_path, metadata
                         )
-                        if plugin_class is not None:
-                            plugins[metadata.namespace] = (metadata, plugin_class)
+                        if source_plugin_class is not None:
+                            actual_source_plugin_class: Type[PluginBase] = source_plugin_class
+                            plugins[metadata.namespace] = (metadata, actual_source_plugin_class)
                     except Exception as e:
                         error(f"警告: 加载插件源码目录 {item} 失败: {e}")
                         continue

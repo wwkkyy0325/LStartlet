@@ -291,15 +291,14 @@ class Scheduler:
                 actual_max_retries = max_retries or 3
 
             # Submit task to dispatcher
-            self._task_dispatcher.submit_task(
-                task_id=task_id,
-                func=func,
-                priority=priority,
-                timeout=actual_timeout,
-                max_retries=actual_max_retries,
-                *args,
-                **kwargs,
-            )
+            task_kwargs = {
+                "task_id": task_id,
+                "func": func,
+                "priority": priority,
+                "timeout": actual_timeout,
+                "max_retries": actual_max_retries,
+            }
+            self._task_dispatcher.submit_task(*args, **{**task_kwargs, **kwargs})
 
             # Publish task submitted event
             task_data: Dict[str, Any] = {

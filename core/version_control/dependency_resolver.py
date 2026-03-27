@@ -21,9 +21,9 @@ class DependencyResolver:
         # Python标准库模块
         stdlib_names = getattr(sys, "stdlib_module_names", None)
         if stdlib_names is not None:
-            self.stdlib_modules: Set[str] = set(stdlib_names)
+            self.stdlib_modules = set(stdlib_names)
         else:
-            self.stdlib_modules: Set[str] = self._get_stdlib_modules()
+            self.stdlib_modules = self._get_stdlib_modules()
 
     def _get_stdlib_modules(self) -> Set[str]:
         """获取Python标准库模块列表"""

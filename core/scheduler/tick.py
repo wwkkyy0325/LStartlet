@@ -5,9 +5,9 @@
 
 import asyncio
 import time
-from typing import Callable, Optional, Dict, Any, List, Awaitable
-from dataclasses import dataclass
 from enum import Enum
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Callable, Awaitable, Union, Any, overload
 
 # 使用项目自定义日志管理器
 from core.logger import info, warning, error, debug
@@ -108,7 +108,18 @@ class TickComponent:
             raise ValueError("Callback must be callable")
         self._async_tick_callbacks.append(callback)
 
-    def remove_tick_callback(self, callback: Callable[..., Any]) -> bool:
+    @overload
+    def remove_tick_callback(self, callback: Callable[[int, float], None]) -> bool:
+        ...
+
+    @overload  
+    def remove_tick_callback(self, callback: Callable[[int, float], Awaitable[None]]) -> bool:
+        ...
+
+    def remove_tick_callback(
+        self, 
+        callback: Union[Callable[[int, float], None], Callable[[int, float], Awaitable[None]]]
+    ) -> bool:
         """
         移除tick回调函数
 
@@ -126,7 +137,7 @@ class TickComponent:
 
         # 尝试从异步回调列表中移除
         for i, cb in enumerate(self._async_tick_callbacks):
-            if cb is callback:
+            if cb is callback:  # type: ignore
                 del self._async_tick_callbacks[i]
                 return True
 
@@ -243,7 +254,7 @@ class TickComponent:
         async_callbacks: List[Awaitable[None]] = []
         for callback in self._async_tick_callbacks[:]:
             try:
-                result = callback(self._current_tick, elapsed_time)
+                result = callback(self._current_tick, elapsed_time)  # type: ignore
                 if asyncio.iscoroutine(result):
                     async_callbacks.append(result)
             except Exception as e:

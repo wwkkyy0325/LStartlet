@@ -101,13 +101,13 @@ class ProcessManager:
             info(f"Worker {worker_id} started with PID: {os.getpid()}")
 
             # 发布进程启动事件
-            process_data: Dict[str, Any] = {
+            start_process_data: Dict[str, Any] = {
                 "worker_id": worker_id,
                 "start_time": time.time(),
                 "max_processes": self.max_processes,
                 "process_timeout": self.process_timeout,
             }
-            self._event_bus.publish(ProcessStartedEvent(process_id, process_data))
+            self._event_bus.publish(ProcessStartedEvent(process_id, start_process_data))
 
             # 工作进程主循环（简化实现）
             while True:
@@ -122,12 +122,12 @@ class ProcessManager:
             info(f"Worker {worker_id} stopped")
 
             # 发布进程停止事件
-            process_data: Dict[str, Any] = {
+            stop_process_data: Dict[str, Any] = {
                 "worker_id": worker_id,
                 "stop_time": time.time(),
             }
             self._event_bus.publish(
-                ProcessStoppedEvent(process_id, process_data=process_data)
+                ProcessStoppedEvent(process_id, process_data=stop_process_data)
             )
 
     def _on_worker_process_terminated(self, pid: int, process_type: str) -> None:

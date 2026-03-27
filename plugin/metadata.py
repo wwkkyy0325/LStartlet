@@ -5,7 +5,7 @@
 
 import json
 import os
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TypedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -190,13 +190,19 @@ class PluginCompatibilityChecker:
                 return 0
 
 
+class PluginAvailabilityResult(TypedDict):
+    available: bool
+    reasons: List[str]
+    missing_dependencies: List[str]
+
+
 class PluginAvailabilityChecker:
     """插件可用性检查器"""
 
     def __init__(self, dependency_manager):
         self.dependency_manager = dependency_manager
 
-    def check_availability(self, metadata: PluginMetadata) -> Dict[str, Any]:
+    def check_availability(self, metadata: PluginMetadata) -> PluginAvailabilityResult:
         """
         检查插件的可用性
 
@@ -208,7 +214,7 @@ class PluginAvailabilityChecker:
                 'missing_dependencies': List[str]  # 缺失的依赖列表
             }
         """
-        result = {"available": True, "reasons": [], "missing_dependencies": []}
+        result: PluginAvailabilityResult = {"available": True, "reasons": [], "missing_dependencies": []}
 
         # 检查依赖是否完整
         if metadata.dependencies:

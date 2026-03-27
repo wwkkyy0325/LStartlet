@@ -282,12 +282,12 @@ class TaskDispatcher:
             self._completed_tasks.append(task)
 
             # 发布任务完成事件
-            task_data: Dict[str, Any] = {
+            completed_task_data: Dict[str, Any] = {
                 "func_name": getattr(task.func, "__name__", str(task.func)),
                 "priority": task.priority.name,
                 "execution_time": time.time() - task.created_at,
             }
-            self._event_bus.publish(TaskCompletedEvent(task.task_id, result, task_data))
+            self._event_bus.publish(TaskCompletedEvent(task.task_id, result, completed_task_data))
 
             return result
 
@@ -300,14 +300,14 @@ class TaskDispatcher:
             else:
                 self._failed_tasks.append(task)
                 # 发布任务失败事件
-                task_data: Dict[str, Any] = {
+                failed_task_data: Dict[str, Any] = {
                     "func_name": getattr(task.func, "__name__", str(task.func)),
                     "priority": task.priority.name,
                     "error_type": "TimeoutError",
                     "retry_count": task.retry_count,
                 }
                 self._event_bus.publish(
-                    TaskFailedEvent(task.task_id, str(e), task_data)
+                    TaskFailedEvent(task.task_id, str(e), failed_task_data)
                 )
             raise
 
