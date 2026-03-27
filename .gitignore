@@ -82,9 +82,6 @@ output/
 # Data directories
 data/
 
-# Plugin directories (individual plugins should be managed separately)
-plugin/
-
 # Windows specific
 Thumbs.db
 ehthumbs.db

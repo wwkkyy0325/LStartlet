@@ -20,7 +20,7 @@ class ServiceDescriptor:
         self,
         service_type: Type[T],
         implementation_type: Optional[Type[T]] = None,
-        factory: Optional[Callable[["ServiceContainer"], T]] = None,  # type: ignore
+        factory: Optional[Callable[["ServiceContainer"], T]] = None,  # type: ignore[name-defined]  # noqa: F821
         instance: Optional[T] = None,
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
     ):

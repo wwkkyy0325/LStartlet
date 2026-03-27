@@ -157,7 +157,7 @@ class ConfigUtils:
             )
 
             # 保留最新的 max_backups 个备份
-            for old_file in backup_files[max_backups - 1 :]:
+            for old_file in backup_files[max_backups - 1:]:
                 os.remove(os.path.join(backup_dir, old_file))
 
             # 创建新备份

@@ -7,7 +7,7 @@ Test the CICDController class functionality
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -41,7 +41,7 @@ class TestCICDController(unittest.TestCase):
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
         """测试控制器初始化"""
-        controller = CICDController(self.project_root)
+        CICDController(self.project_root)
 
         # 验证所有组件都被正确初始化
         mock_version_controller.assert_called_once_with(self.project_root)

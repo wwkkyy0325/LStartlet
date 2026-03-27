@@ -224,7 +224,7 @@ class RotatingFileHandler(BaseHandler):
             for filename in os.listdir(log_dir):
                 if filename.startswith(base_stem + "_") and filename.endswith(".log"):
                     # 尝试解析文件名中的日期
-                    suffix = filename[len(base_stem) + 1 : -4]  # 移除基础名和.log
+                    suffix = filename[len(base_stem) + 1:-4]  # 移除基础名和.log
                     if "_" in suffix:
                         # 时间戳格式 YYYYMMDD_HHMMSS
                         date_part = suffix.split("_")[0]

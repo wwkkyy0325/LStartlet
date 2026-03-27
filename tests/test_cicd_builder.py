@@ -9,7 +9,6 @@ import unittest
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))

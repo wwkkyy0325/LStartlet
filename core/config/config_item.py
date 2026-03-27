@@ -48,6 +48,6 @@ class ConfigItem:
         if self.validator is not None:
             return self.validator(value)
         # 基本类型检查
-        if self.value_type == type(None):
+        if self.value_type is type(None):
             return value is None
         return isinstance(value, self.value_type)

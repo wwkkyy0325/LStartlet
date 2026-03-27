@@ -223,25 +223,36 @@ class Tester:
             for test, trace in test_result.errors:
                 testcase = ET.SubElement(root, "testcase")
                 testcase.set("name", str(test))
-                testcase.set("classname", test.__class__.__name__)
+                testcase.set("classname", str(test.__class__.__name__))
                 error_elem = ET.SubElement(testcase, "error")
                 error_elem.text = trace
 
-            # 保存JUnit报告
-            junit_filename = (
-                f"junit_report_{test_suite}_{start_time.strftime('%Y%m%d_%H%M%S')}.xml"
-            )
-            junit_path = os.path.join(self.report_dir, junit_filename)
+            for test, _ in test_result.skipped:
+                testcase = ET.SubElement(root, "testcase")
+                testcase.set("name", str(test))
+                testcase.set("classname", str(test.__class__.__name__))
+                skipped = ET.SubElement(testcase, "skipped")
 
-            tree = ET.ElementTree(root)
-            tree.write(junit_path, encoding="utf-8", xml_declaration=True)
-
-            info(f"JUnit测试报告已保存: {junit_path}")
-            return junit_path
-
+            # 生成XML字符串
+            return ET.tostring(root, encoding="unicode")
         except Exception as e:
             error(f"生成JUnit报告时出错: {e}")
-            return ""
+            # 返回简单的错误报告
+            root = ET.Element("testsuite")
+            root.set("name", test_suite or "unknown")
+            root.set("tests", "0")
+            root.set("failures", "1")
+            root.set("errors", "0")
+            root.set("skipped", "0")
+            root.set("timestamp", datetime.now().isoformat())
+            
+            testcase = ET.SubElement(root, "testcase")
+            testcase.set("name", "report_generation")
+            testcase.set("classname", "Tester")
+            failure = ET.SubElement(testcase, "failure")
+            failure.text = f"Report generation failed: {str(e)}"
+            
+            return ET.tostring(root, encoding="unicode")
 
     def run_performance_tests(
         self, test_targets: Optional[List[str]] = None

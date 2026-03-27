@@ -15,7 +15,10 @@ setup(
     version="0.1.0",
     author="wwkkyy0325",
     author_email="1074446976@qq.com",
-    description="A modular, high-cohesion, low-coupling infrastructure framework for Python applications",
+    description=(
+        "A modular, high-cohesion, low-coupling infrastructure framework "
+        "for Python applications"
+    ),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/wwkkyy0325/LStartlet",
