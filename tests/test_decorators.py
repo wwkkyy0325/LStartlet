@@ -15,7 +15,7 @@ from typing import Any, Dict
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.decorators import (
+from LStartlet.core.decorators import (
     with_error_handling,
     with_logging,
     with_error_handling_async,
@@ -33,7 +33,7 @@ from core.decorators import (
     PermissionLevel,
     MetricsCollector,
 )
-from core.error.exceptions import InfrastructureError
+from LStartlet.core.error.exceptions import InfrastructureError
 
 
 class TestPermissionLevel(unittest.TestCase):
@@ -130,7 +130,7 @@ class TestWithLoggingDecorator(unittest.TestCase):
 
     def test_with_logging_success(self):
         """测试成功执行的日志"""
-        with patch("core.logger.info") as mock_info:
+        with patch("LStartlet.core.logger.info") as mock_info:
 
             @with_logging(level="info")
             def success_func():
@@ -144,7 +144,7 @@ class TestWithLoggingDecorator(unittest.TestCase):
 
     def test_with_logging_exception(self):
         """测试异常情况的日志"""
-        with patch("core.logger.info"):
+        with patch("LStartlet.core.logger.info"):
 
             @with_logging(level="info")
             def error_func():
@@ -156,7 +156,7 @@ class TestWithLoggingDecorator(unittest.TestCase):
 
     def test_with_logging_measure_time(self):
         """测试测量执行时间"""
-        with patch("core.logger.info"):
+        with patch("LStartlet.core.logger.info"):
 
             @with_logging(level="info", measure_time=True)
             def slow_func():
@@ -196,7 +196,7 @@ class TestAsyncDecorators(unittest.TestCase):
 
     def test_with_logging_async(self):
         """测试异步日志装饰器"""
-        with patch("core.logger.info"):
+        with patch("LStartlet.core.logger.info"):
 
             @with_logging_async(level="info")
             async def async_success_func():
@@ -232,7 +232,7 @@ class TestPermissionDecorators(unittest.TestCase):
     def test_require_permission_success(self):
         """测试权限检查成功"""
         with patch(
-            "core.decorators._get_current_user_permission_level",
+            "LStartlet.core.decorators._get_current_user_permission_level",
             return_value=PermissionLevel.ADMIN,
         ):
 
@@ -246,7 +246,7 @@ class TestPermissionDecorators(unittest.TestCase):
     def test_require_permission_failure(self):
         """测试权限检查失败"""
         with patch(
-            "core.decorators._get_current_user_permission_level",
+            "LStartlet.core.decorators._get_current_user_permission_level",
             return_value=PermissionLevel.USER,
         ):
 
@@ -266,7 +266,7 @@ class TestPermissionDecorators(unittest.TestCase):
 
         try:
             with patch(
-                "core.decorators._get_current_user_permission_level",
+                "LStartlet.core.decorators._get_current_user_permission_level",
                 return_value=PermissionLevel.ADMIN,
             ):
 
@@ -331,7 +331,7 @@ class TestOtherDecorators(unittest.TestCase):
 
     def test_publish_event_success(self):
         """测试事件发布装饰器成功"""
-        with patch("core.logger.info") as mock_info:
+        with patch("LStartlet.core.logger.info") as mock_info:
 
             @publish_event("test.event")
             def success_func():
@@ -345,7 +345,7 @@ class TestOtherDecorators(unittest.TestCase):
 
     def test_publish_event_failure(self):
         """测试事件发布装饰器失败"""
-        with patch("core.logger.info") as mock_info:
+        with patch("LStartlet.core.logger.info") as mock_info:
 
             @publish_event("test.event", success_only=False)
             def error_func():
@@ -358,7 +358,9 @@ class TestOtherDecorators(unittest.TestCase):
     def test_validate_config(self):
         """测试配置验证装饰器"""
         # Mock ConfigManager - 修正导入路径
-        with patch("core.config.config_manager.ConfigManager") as mock_config_manager:
+        with patch(
+            "LStartlet.core.config.config_manager.ConfigManager"
+        ) as mock_config_manager:
             mock_instance = MagicMock()
             mock_instance.get_config.return_value = "valid_value"
             mock_config_manager.return_value = mock_instance

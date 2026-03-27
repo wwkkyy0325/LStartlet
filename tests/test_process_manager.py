@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.scheduler.process_manager import ProcessManager
+from LStartlet.core.scheduler.process_manager import ProcessManager
 
 
 class TestProcessManager(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestProcessManager(unittest.TestCase):
 
         # Mock get_app_container().resolve(EventBus)
         self.mock_app_container_patch = patch(
-            "core.scheduler.process_manager.get_app_container"
+            "LStartlet.core.scheduler.process_manager.get_app_container"
         )
         self.mock_app_container = self.mock_app_container_patch.start()
         mock_container_instance = Mock()
@@ -34,7 +34,7 @@ class TestProcessManager(unittest.TestCase):
 
         # Mock GlobalProcessManager
         self.mock_global_process_manager_patch = patch(
-            "core.scheduler.process_manager.GlobalProcessManager"
+            "LStartlet.core.scheduler.process_manager.GlobalProcessManager"
         )
         self.mock_global_process_manager_class = (
             self.mock_global_process_manager_patch.start()

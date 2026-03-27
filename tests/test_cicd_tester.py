@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.cicd.tester import Tester
+from LStartlet.core.cicd.tester import Tester
 
 
 class TestTester(unittest.TestCase):
@@ -23,7 +23,7 @@ class TestTester(unittest.TestCase):
         """测试前准备"""
         self.project_root = str(Path(__file__).parent.parent)
         # 重置配置
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
         # 确保测试报告目录存在
@@ -32,7 +32,7 @@ class TestTester(unittest.TestCase):
 
     def tearDown(self):
         """测试后清理"""
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
         # 清理测试报告目录
@@ -46,8 +46,8 @@ class TestTester(unittest.TestCase):
 
         self.assertEqual(tester.project_root, self.project_root)
 
-    @patch("core.cicd.tester.unittest.TextTestRunner")
-    @patch("core.cicd.tester.unittest.TestLoader")
+    @patch("LStartlet.core.cicd.tester.unittest.TextTestRunner")
+    @patch("LStartlet.core.cicd.tester.unittest.TestLoader")
     def test_run_test_directory_success(self, mock_loader, mock_runner):
         """测试运行测试目录成功"""
         # 模拟测试结果
@@ -67,7 +67,7 @@ class TestTester(unittest.TestCase):
         self.assertEqual(result["total_tests"], 15)
         self.assertEqual(result["passed"], 15)
 
-    @patch("core.cicd.tester.subprocess.run")
+    @patch("LStartlet.core.cicd.tester.subprocess.run")
     def test_run_test_file_success(self, mock_subprocess_run):
         """测试运行测试文件成功"""
         # 模拟 subprocess 结果
@@ -86,8 +86,8 @@ class TestTester(unittest.TestCase):
         self.assertEqual(result["return_code"], 0)
         self.assertEqual(result["suite"], "test_example.py")
 
-    @patch("core.cicd.tester.unittest.TextTestRunner")
-    @patch("core.cicd.tester.unittest.TestLoader")
+    @patch("LStartlet.core.cicd.tester.unittest.TextTestRunner")
+    @patch("LStartlet.core.cicd.tester.unittest.TestLoader")
     def test_run_tests_with_unittest_discovery(self, mock_loader, mock_runner):
         """测试使用 unittest 发现机制运行测试"""
         # 模拟测试结果

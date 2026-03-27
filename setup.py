@@ -22,15 +22,13 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/wwkkyy0325/LStartlet",
+    package_dir={"": "src"},
     packages=find_packages(
+        where="src",
         exclude=[
-            "tests*",
-            "test_reports*",
-            "build*",
-            "deployment*",
-            "plugin.example_ocr_plugin",
-            "plugin.example_ocr_plugin.*",
-        ]
+            "LStartlet.plugin.example_ocr_plugin",
+            "LStartlet.plugin.example_ocr_plugin.*",
+        ],
     ),
     classifiers=[
         "Development Status :: 4 - Beta",

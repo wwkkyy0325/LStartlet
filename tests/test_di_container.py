@@ -4,13 +4,13 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import unittest
-from core.di import (
+from LStartlet.core.di import (
     ServiceContainer,
     ServiceLifetime,
     ServiceResolutionError,
     ServiceRegistrationError,
 )
-from core.di.service_container import get_default_container
+from LStartlet.core.di.service_container import get_default_container
 
 
 class TestService:

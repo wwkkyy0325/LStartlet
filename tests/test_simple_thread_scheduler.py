@@ -1,6 +1,6 @@
 import unittest
 import sys
-from core.scheduler.simple_thread_scheduler import SimpleThreadScheduler
+from LStartlet.core.scheduler.simple_thread_scheduler import SimpleThreadScheduler
 
 
 class TestSimpleThreadScheduler(unittest.TestCase):

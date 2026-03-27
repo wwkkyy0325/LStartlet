@@ -13,7 +13,7 @@ from pathlib import Path
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.config.config_manager import ConfigManager
+from LStartlet.core.config.config_manager import ConfigManager
 
 
 class TestConfigManagerInternalMethods(unittest.TestCase):

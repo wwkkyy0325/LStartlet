@@ -14,7 +14,7 @@ sys_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if sys_path not in sys.path:
     sys.path.insert(0, sys_path)
 
-from plugin.manager.dependency_manager import PluginDependencyManager
+from LStartlet.plugin.manager.dependency_manager import PluginDependencyManager
 
 
 class TestPluginDependencyManager(unittest.TestCase):
@@ -81,7 +81,7 @@ class TestPluginDependencyManager(unittest.TestCase):
         result = self.dep_manager._simple_version_check("1.0.0", "<1.1.0")  # type: ignore
         self.assertTrue(result)
 
-    @patch("plugin.manager.dependency_manager.subprocess.run")
+    @patch("LStartlet.plugin.manager.dependency_manager.subprocess.run")
     def test_install_dependency_success(self, mock_run: Mock):
         """测试成功安装依赖"""
         mock_result = MagicMock()
@@ -93,7 +93,7 @@ class TestPluginDependencyManager(unittest.TestCase):
         self.assertTrue(result)
         self.assertIn("test_plugin:requests", self.dep_manager.installed_deps)
 
-    @patch("plugin.manager.dependency_manager.subprocess.run")
+    @patch("LStartlet.plugin.manager.dependency_manager.subprocess.run")
     def test_install_dependency_failure(self, mock_run: Mock):
         """测试安装依赖失败"""
         mock_result = MagicMock()

@@ -12,8 +12,8 @@ from unittest.mock import patch
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.cicd.cicd_controller import CICDController
-from core.cicd.pipeline import Pipeline, Stage, Step
+from LStartlet.core.cicd.cicd_controller import CICDController
+from LStartlet.core.cicd.pipeline import Pipeline, Stage, Step
 
 
 class TestCICDController(unittest.TestCase):
@@ -23,20 +23,20 @@ class TestCICDController(unittest.TestCase):
         """测试前准备"""
         self.project_root = str(Path(__file__).parent.parent)
         # 重置配置管理器状态
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
     def tearDown(self):
         """测试后清理"""
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_controller_initialization(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
@@ -50,16 +50,16 @@ class TestCICDController(unittest.TestCase):
         mock_deployer.assert_called_once_with(self.project_root)
 
         # 验证配置项被正确注册
-        from core.config import has_config
+        from LStartlet.core.config import has_config
 
         self.assertTrue(has_config("cicd.pipeline.timeout"))
         self.assertTrue(has_config("cicd.build.output_dir"))
         self.assertTrue(has_config("cicd.test.report_dir"))
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_run_pipeline_success(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
@@ -89,10 +89,10 @@ class TestCICDController(unittest.TestCase):
         )
         mock_deployer.return_value.deploy.assert_called_once()
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_run_pipeline_failure_in_step(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
@@ -119,10 +119,10 @@ class TestCICDController(unittest.TestCase):
         # 部署不应该被调用
         mock_deployer.return_value.deploy.assert_not_called()
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_run_pipeline_version_tag_failure(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
@@ -144,10 +144,10 @@ class TestCICDController(unittest.TestCase):
         # 部署不应该被调用
         mock_deployer.return_value.deploy.assert_not_called()
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_run_build(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):
@@ -162,10 +162,10 @@ class TestCICDController(unittest.TestCase):
         self.assertTrue(result)
         mock_builder.return_value.build.assert_called_once_with(["target1", "target2"])
 
-    @patch("core.cicd.cicd_controller.VersionController")
-    @patch("core.cicd.cicd_controller.Builder")
-    @patch("core.cicd.cicd_controller.Tester")
-    @patch("core.cicd.cicd_controller.Deployer")
+    @patch("LStartlet.core.cicd.cicd_controller.VersionController")
+    @patch("LStartlet.core.cicd.cicd_controller.Builder")
+    @patch("LStartlet.core.cicd.cicd_controller.Tester")
+    @patch("LStartlet.core.cicd.cicd_controller.Deployer")
     def test_run_tests(
         self, mock_deployer, mock_tester, mock_builder, mock_version_controller
     ):

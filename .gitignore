@@ -1,5 +1,5 @@
 # Python
-__pycache__/
+
 *.py[cod]
 *$py.class
 *.so
@@ -87,4 +87,13 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+# Deployment directory - exclude from version control
 /deployment/*
+src/LStartlet/deployment/
+src/LStartlet/deployment/*
+
+# Keep existing specific rules (they are redundant now but harmless)
+.pypirc
+*/__pycache__/*
+*.pyc

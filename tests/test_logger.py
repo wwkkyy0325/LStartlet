@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Logger Module Unit Tests
-Test core functionality of logger, handler, level, etc.
+Test LStartlet.core functionality of logger, handler, level, etc.
 """
 
 import os
@@ -14,7 +14,7 @@ from pathlib import Path
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.logger import (
+from LStartlet.core.logger import (
     debug,
     info,
     warning,
@@ -23,9 +23,9 @@ from core.logger import (
     configure_logger,
     set_process_type,
 )
-from core.logger.level import LogLevel, LogRecord
-from core.logger.handler import ConsoleHandler, RotatingFileHandler
-from core.logger.logger import LoggerCore, MultiProcessLogger
+from LStartlet.core.logger.level import LogLevel, LogRecord
+from LStartlet.core.logger.handler import ConsoleHandler, RotatingFileHandler
+from LStartlet.core.logger.logger import LoggerCore, MultiProcessLogger
 
 
 class TestLogLevel(unittest.TestCase):

@@ -27,8 +27,14 @@ extend-exclude = '''
 '''
 
 [tool.coverage.run]
-source = ["core", "plugin"]
-omit = ["*/__pycache__/*", "*/tests/*", "*/examples/*"]
+source = ["src/LStartlet/core", "src/LStartlet/plugin"]
+omit = [
+    "*/__pycache__/*", 
+    "*/tests/*", 
+    "*/examples/*",
+    "src/LStartlet/__pycache__/*",
+    "src/LStartlet/tests/*"
+]
 
 [tool.coverage.report]
 exclude_lines = [

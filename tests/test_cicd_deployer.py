@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.cicd.deployer import Deployer
+from LStartlet.core.cicd.deployer import Deployer
 
 
 class TestDeployer(unittest.TestCase):
@@ -22,13 +22,13 @@ class TestDeployer(unittest.TestCase):
         """测试前准备"""
         self.project_root = str(Path(__file__).parent.parent)
         # 重置配置
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
     def tearDown(self):
         """测试后清理"""
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
@@ -39,7 +39,7 @@ class TestDeployer(unittest.TestCase):
         self.assertEqual(deployer.project_root, self.project_root)
         self.assertEqual(deployer.deployment_history, [])
 
-    @patch("core.cicd.deployer.Deployer._get_deployment_config")
+    @patch("LStartlet.core.cicd.deployer.Deployer._get_deployment_config")
     def test_deploy_success(self, mock_get_config):
         """测试部署成功"""
         deployer = Deployer()
@@ -58,7 +58,7 @@ class TestDeployer(unittest.TestCase):
                 "dev", "/fake/artifact", {"host": "localhost", "port": 8080}
             )
 
-    @patch("core.cicd.deployer.Deployer._get_deployment_config")
+    @patch("LStartlet.core.cicd.deployer.Deployer._get_deployment_config")
     def test_deploy_failure(self, mock_get_config):
         """测试部署失败"""
         deployer = Deployer()
@@ -77,7 +77,7 @@ class TestDeployer(unittest.TestCase):
                 "dev", "/fake/artifact", {"host": "localhost", "port": 8080}
             )
 
-    @patch("core.cicd.deployer.Deployer._get_deployment_config")
+    @patch("LStartlet.core.cicd.deployer.Deployer._get_deployment_config")
     def test_deploy_with_models(self, mock_get_config):
         """测试包含模型文件的部署"""
         deployer = Deployer()
@@ -96,7 +96,7 @@ class TestDeployer(unittest.TestCase):
                 "prod", "/fake/artifact", {"host": "localhost", "port": 8080}
             )
 
-    @patch("core.cicd.deployer.Deployer._get_deployment_config")
+    @patch("LStartlet.core.cicd.deployer.Deployer._get_deployment_config")
     def test_deploy_exception(self, mock_get_config):
         """测试部署异常"""
         deployer = Deployer()

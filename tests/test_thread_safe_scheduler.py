@@ -2,7 +2,7 @@ import unittest
 import asyncio
 import time
 import sys
-from core.scheduler.thread_safe_scheduler import ThreadSafeScheduler
+from LStartlet.core.scheduler.thread_safe_scheduler import ThreadSafeScheduler
 
 
 class TestThreadSafeScheduler(unittest.TestCase):

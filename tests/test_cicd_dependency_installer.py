@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, Mock
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.cicd.dependency_installer import DependencyInstaller
+from LStartlet.core.cicd.dependency_installer import DependencyInstaller
 
 
 class TestDependencyInstaller(unittest.TestCase):
@@ -22,13 +22,13 @@ class TestDependencyInstaller(unittest.TestCase):
         """测试前准备"""
         self.project_root = str(Path(__file__).parent.parent)
         # 重置配置
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
     def tearDown(self):
         """测试后清理"""
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
@@ -38,7 +38,9 @@ class TestDependencyInstaller(unittest.TestCase):
 
         self.assertEqual(installer.project_root, self.project_root)
 
-    @patch("core.cicd.dependency_installer.os.path.exists", return_value=False)
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.os.path.exists", return_value=False
+    )
     def test_check_and_install_missing_no_requirements(self, mock_exists):
         """测试没有 requirements.txt 文件"""
         installer = DependencyInstaller(self.project_root)
@@ -46,9 +48,15 @@ class TestDependencyInstaller(unittest.TestCase):
 
         self.assertTrue(result)  # 没有 requirements 文件时返回 True
 
-    @patch("core.cicd.dependency_installer.DependencyInstaller._load_requirements")
-    @patch("core.cicd.dependency_installer.DependencyInstaller._find_missing_packages")
-    @patch("core.cicd.dependency_installer.DependencyInstaller.install_packages")
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller._load_requirements"
+    )
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller._find_missing_packages"
+    )
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller.install_packages"
+    )
     def test_check_and_install_missing_success(
         self, mock_install, mock_find, mock_load
     ):
@@ -64,9 +72,15 @@ class TestDependencyInstaller(unittest.TestCase):
         self.assertTrue(result)
         mock_install.assert_called_once()
 
-    @patch("core.cicd.dependency_installer.DependencyInstaller._load_requirements")
-    @patch("core.cicd.dependency_installer.DependencyInstaller._find_missing_packages")
-    @patch("core.cicd.dependency_installer.DependencyInstaller.install_packages")
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller._load_requirements"
+    )
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller._find_missing_packages"
+    )
+    @patch(
+        "LStartlet.core.cicd.dependency_installer.DependencyInstaller.install_packages"
+    )
     def test_check_and_install_missing_installation_failure(
         self, mock_install, mock_find, mock_load
     ):

@@ -12,10 +12,10 @@ from unittest.mock import Mock
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.event.event_bus import EventBus
-from core.event.event_handler import LambdaEventHandler, CompositeEventHandler
-from core.event.event_type_registry import EventTypeRegistry
-from core.event.base_event import BaseEvent
+from LStartlet.core.event.event_bus import EventBus
+from LStartlet.core.event.event_handler import LambdaEventHandler, CompositeEventHandler
+from LStartlet.core.event.event_type_registry import EventTypeRegistry
+from LStartlet.core.event.base_event import BaseEvent
 
 
 # 创建具体的事件类用于测试

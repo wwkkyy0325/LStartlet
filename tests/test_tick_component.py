@@ -12,7 +12,7 @@ from unittest.mock import patch
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.scheduler.tick import TickComponent, TickConfig, TickState
+from LStartlet.core.scheduler.tick import TickComponent, TickConfig, TickState
 
 
 class TestTickConfig(unittest.TestCase):

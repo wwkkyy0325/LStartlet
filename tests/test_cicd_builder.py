@@ -13,7 +13,7 @@ from pathlib import Path
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.cicd.builder import Builder
+from LStartlet.core.cicd.builder import Builder
 
 
 class TestBuilder(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestBuilder(unittest.TestCase):
         self.project_root = str(Path(__file__).parent.parent)
         self.temp_dir = tempfile.mkdtemp()
         # 注册并设置配置
-        from core.config import register_config, set_config
+        from LStartlet.core.config import register_config, set_config
 
         register_config("cicd.build.output_dir", "./build", str, "构建输出目录")
         set_config("cicd.build.output_dir", self.temp_dir)
@@ -35,7 +35,7 @@ class TestBuilder(unittest.TestCase):
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
         # 重置配置
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 

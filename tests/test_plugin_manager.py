@@ -12,10 +12,10 @@ from typing import Dict
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from plugin.manager.plugin_manager import PluginManager
-from plugin.base.plugin_base import PluginBase
-from core.di import ServiceContainer
-from core.event.event_bus import EventBus
+from LStartlet.plugin.manager.plugin_manager import PluginManager
+from LStartlet.plugin.base.plugin_base import PluginBase
+from LStartlet.core.di import ServiceContainer
+from LStartlet.core.event.event_bus import EventBus
 
 
 class MockPlugin(PluginBase):
@@ -115,7 +115,7 @@ class TestPluginManager(unittest.TestCase):
     def test_unload_plugin_success(self):
         """测试成功卸载插件"""
         # 创建模拟插件元数据
-        from plugin.manager.plugin_loader import PluginMetadata
+        from LStartlet.plugin.manager.plugin_loader import PluginMetadata
 
         mock_metadata = PluginMetadata(
             namespace="mock_plugin",

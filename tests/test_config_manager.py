@@ -13,7 +13,7 @@ from typing import Dict, Any
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.scheduler.config_manager import ConfigManager, SchedulerConfig
+from LStartlet.core.scheduler.config_manager import ConfigManager, SchedulerConfig
 
 
 class TestSchedulerConfig(unittest.TestCase):

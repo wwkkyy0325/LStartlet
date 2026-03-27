@@ -11,8 +11,8 @@ from unittest.mock import Mock, patch
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.scheduler.scheduler import Scheduler
-from core.scheduler.task_dispatcher import TaskDispatcher, TaskPriority
+from LStartlet.core.scheduler.scheduler import Scheduler
+from LStartlet.core.scheduler.task_dispatcher import TaskDispatcher, TaskPriority
 
 
 class TestScheduler(unittest.TestCase):
@@ -21,7 +21,9 @@ class TestScheduler(unittest.TestCase):
     def setUp(self):
         """测试前准备"""
         # Mock ProcessManager以避免多进程问题
-        with patch("core.scheduler.scheduler.ProcessManager") as mock_process_manager:
+        with patch(
+            "LStartlet.core.scheduler.scheduler.ProcessManager"
+        ) as mock_process_manager:
             mock_instance = Mock()
             mock_instance.get_active_process_count.return_value = 0
             mock_instance.start.return_value = None

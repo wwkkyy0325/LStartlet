@@ -13,8 +13,8 @@ from typing import Dict
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from plugin.manager.plugin_loader import PluginLoader
-from plugin.base.plugin_base import PluginBase
+from LStartlet.plugin.manager.plugin_loader import PluginLoader
+from LStartlet.plugin.base.plugin_base import PluginBase
 
 
 class MockPluginForLoader(PluginBase):
@@ -103,7 +103,7 @@ class TestPluginLoader(unittest.TestCase):
         """测试从目录加载插件文件"""
         # 创建一个简单的插件文件，确保继承PluginBase
         plugin_content = """
-from plugin.base.plugin_base import PluginBase
+from LStartlet.plugin.base.plugin_base import PluginBase
 
 class SimpleTestPlugin(PluginBase):
     def __init__(self):

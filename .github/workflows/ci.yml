@@ -51,7 +51,9 @@ jobs:
       continue-on-error: true
       if: matrix.python-version == '3.9'  # Only run type checking on Python 3.9 to save time
       run: |
-        python -m mypy core plugin tests --ignore-missing-imports
+        # Configure mypy for src layout
+        echo "MYPYPATH=src" >> $GITHUB_ENV
+        python -m mypy src --explicit-package-bases
 
   build:
     needs: test

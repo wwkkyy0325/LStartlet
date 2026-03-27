@@ -11,14 +11,14 @@ from pathlib import Path
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.command.commands.system_commands import (
+from LStartlet.core.command.commands.system_commands import (
     EchoCommand,
     SystemInfoCommand,
     ShutdownCommand,
     ClearCacheCommand,
 )
-from core.command.command_executor import CommandExecutor
-from core.command.command_registry import CommandRegistry
+from LStartlet.core.command.command_executor import CommandExecutor
+from LStartlet.core.command.command_registry import CommandRegistry
 
 
 class TestCommandSystem(unittest.TestCase):
@@ -27,13 +27,13 @@ class TestCommandSystem(unittest.TestCase):
     def setUp(self):
         """测试前准备"""
         # 重置配置
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 
     def tearDown(self):
         """测试后清理"""
-        from core.config import reset_all_configs
+        from LStartlet.core.config import reset_all_configs
 
         reset_all_configs()
 

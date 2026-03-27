@@ -12,9 +12,9 @@ from typing import Dict, Any
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.scheduler.scheduler_factory import SchedulerFactory
-from core.scheduler.scheduler import Scheduler
-from core.scheduler.config_manager import SchedulerConfig
+from LStartlet.core.scheduler.scheduler_factory import SchedulerFactory
+from LStartlet.core.scheduler.scheduler import Scheduler
+from LStartlet.core.scheduler.config_manager import SchedulerConfig
 
 
 class TestSchedulerFactory(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestSchedulerFactory(unittest.TestCase):
         """测试前准备"""
         # Mock ProcessManager以避免多进程问题
         self.mock_process_manager_patch = patch(
-            "core.scheduler.scheduler.ProcessManager"
+            "LStartlet.core.scheduler.scheduler.ProcessManager"
         )
         self.mock_process_manager = self.mock_process_manager_patch.start()
         mock_instance = Mock()
