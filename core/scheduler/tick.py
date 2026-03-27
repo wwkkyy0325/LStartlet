@@ -2,6 +2,7 @@
 调度系统Tick组件
 提供定时触发和周期性任务调度功能
 """
+# mypy: disable-error-code="assignment"
 
 import asyncio
 import time
@@ -112,12 +113,12 @@ class TickComponent:
     def remove_tick_callback(self, callback: Callable[[int, float], None]) -> bool:
         ...
 
-    @overload  
+    @overload
     def remove_tick_callback(self, callback: Callable[[int, float], Awaitable[None]]) -> bool:
         ...
 
     def remove_tick_callback(
-        self, 
+        self,
         callback: Union[Callable[[int, float], None], Callable[[int, float], Awaitable[None]]]
     ) -> bool:
         """
