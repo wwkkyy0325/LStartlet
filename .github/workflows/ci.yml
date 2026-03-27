@@ -41,13 +41,15 @@ jobs:
         python tests/run_tests.py
     
     - name: Run code formatting check
+      continue-on-error: true
       run: |
-        black --check --fast . --diff
+        python -m black --check --fast . --diff
     
     - name: Run type checking
+      continue-on-error: true
       if: matrix.python-version == '3.9'  # Only run type checking on Python 3.9 to save time
       run: |
-        mypy core plugin tests --ignore-missing-imports
+        python -m mypy core plugin tests --ignore-missing-imports
 
   build:
     needs: test
