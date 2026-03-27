@@ -11,7 +11,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     ]
 
 setup(
-    name="LStartlet_wwkkyy0325",
+    name="LStartlet",
     use_scm_version=True,
     author="wwkkyy0325",
     author_email="1074446976@qq.com",
