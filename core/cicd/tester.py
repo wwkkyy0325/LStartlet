@@ -245,13 +245,13 @@ class Tester:
             root.set("errors", "0")
             root.set("skipped", "0")
             root.set("timestamp", datetime.now().isoformat())
-            
+
             testcase = ET.SubElement(root, "testcase")
             testcase.set("name", "report_generation")
             testcase.set("classname", "Tester")
             failure = ET.SubElement(testcase, "failure")
             failure.text = f"Report generation failed: {str(e)}"
-            
+
             return ET.tostring(root, encoding="unicode")
 
     def run_performance_tests(

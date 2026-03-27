@@ -24,9 +24,9 @@ if TYPE_CHECKING:
 
 class CICDController:
     """CI/CD 控制器主类"""
-    
-    system_config_manager: Optional['SystemConfigManager']
-    dependency_installer: Optional['DependencyInstaller']
+
+    system_config_manager: Optional["SystemConfigManager"]
+    dependency_installer: Optional["DependencyInstaller"]
 
     def __init__(self, project_root: Optional[str] = None):
         self.project_root = project_root or get_project_root()

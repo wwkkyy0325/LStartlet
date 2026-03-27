@@ -214,7 +214,11 @@ class PluginAvailabilityChecker:
                 'missing_dependencies': List[str]  # 缺失的依赖列表
             }
         """
-        result: PluginAvailabilityResult = {"available": True, "reasons": [], "missing_dependencies": []}
+        result: PluginAvailabilityResult = {
+            "available": True,
+            "reasons": [],
+            "missing_dependencies": [],
+        }
 
         # 检查依赖是否完整
         if metadata.dependencies:

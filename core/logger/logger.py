@@ -124,7 +124,7 @@ class LoggerCore:
 
             # 从完整路径中移除项目根目录
             if normalized_path.startswith(project_root):
-                relative_path = normalized_path[len(project_root):]
+                relative_path = normalized_path[len(project_root) :]
             else:
                 relative_path = normalized_path
 

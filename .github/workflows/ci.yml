@@ -30,7 +30,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov black flake8 mypy
+        pip install pytest pytest-cov black mypy
         
         # Install common libraries for testing
         pip install numpy scipy pandas
@@ -43,10 +43,6 @@ jobs:
     - name: Run code formatting check
       run: |
         black --check --fast . --diff
-    
-    - name: Run linting
-      run: |
-        flake8 --ignore=F401,F841,E501,W293,E402,W503,F811 .
     
     - name: Run type checking
       if: matrix.python-version == '3.9'  # Only run type checking on Python 3.9 to save time

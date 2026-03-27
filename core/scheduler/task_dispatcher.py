@@ -287,7 +287,9 @@ class TaskDispatcher:
                 "priority": task.priority.name,
                 "execution_time": time.time() - task.created_at,
             }
-            self._event_bus.publish(TaskCompletedEvent(task.task_id, result, completed_task_data))
+            self._event_bus.publish(
+                TaskCompletedEvent(task.task_id, result, completed_task_data)
+            )
 
             return result
 

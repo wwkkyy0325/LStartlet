@@ -148,12 +148,17 @@ class PluginLoader:
                 if os.path.exists(plugin_json_path):
                     try:
                         metadata = PluginMetadata.from_file(plugin_json_path)
-                        source_plugin_class: Optional[Type[PluginBase]] = self._load_plugin_from_source_dir(
-                            item_path, metadata
+                        source_plugin_class: Optional[Type[PluginBase]] = (
+                            self._load_plugin_from_source_dir(item_path, metadata)
                         )
                         if source_plugin_class is not None:
-                            actual_source_plugin_class: Type[PluginBase] = source_plugin_class
-                            plugins[metadata.namespace] = (metadata, actual_source_plugin_class)
+                            actual_source_plugin_class: Type[PluginBase] = (
+                                source_plugin_class
+                            )
+                            plugins[metadata.namespace] = (
+                                metadata,
+                                actual_source_plugin_class,
+                            )
                     except Exception as e:
                         error(f"警告: 加载插件源码目录 {item} 失败: {e}")
                         continue
