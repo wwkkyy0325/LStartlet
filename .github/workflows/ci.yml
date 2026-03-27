@@ -49,7 +49,7 @@ jobs:
         flake8 .
     
     - name: Run type checking
-      if: matrix.python-version == '3.9'  # 只在3.9版本运行类型检查以节省时间
+      if: matrix.python-version == '3.9'  # Only run type checking on Python 3.9 to save time
       run: |
         mypy core plugin tests --ignore-missing-imports
 

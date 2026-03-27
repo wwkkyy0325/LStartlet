@@ -5,7 +5,4 @@
 from .system_detector import SystemDetector
 from .config_manager import SystemConfigManager
 
-__all__ = [
-    'SystemDetector',
-    'SystemConfigManager'
-]
+__all__ = ["SystemDetector", "SystemConfigManager"]

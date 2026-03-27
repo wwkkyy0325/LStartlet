@@ -12,14 +12,13 @@ event_bus = EventBus()
 
 # 定义基础__all__
 __all__ = [
-    'BaseEvent',
-    'CancelableEvent', 
-    'EventMetadata',
-    'EventTypeRegistry',
-    'EventHandler',
-    'LambdaEventHandler',
-    'CompositeEventHandler',
-    'EventBus',
-    'event_bus'
+    "BaseEvent",
+    "CancelableEvent",
+    "EventMetadata",
+    "EventTypeRegistry",
+    "EventHandler",
+    "LambdaEventHandler",
+    "CompositeEventHandler",
+    "EventBus",
+    "event_bus",
 ]
-

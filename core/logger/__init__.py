@@ -1,4 +1,4 @@
-import sys # type: ignore
+import sys  # type: ignore
 from typing import Optional, Dict, Any
 from .logger import MultiProcessLogger, LoggerCore
 from .level import LogLevel
@@ -26,18 +26,18 @@ def _join_paths(base_path: str, *paths: str) -> str:
 
 
 __all__ = [
-    'debug',
-    'info', 
-    'warning',
-    'error',
-    'critical',
-    'configure_logger',
-    'set_process_type',
-    'LogLevel',
-    'ConsoleHandler',
-    'RotatingFileHandler',
-    'MultiProcessLogger',
-    'LoggerCore'
+    "debug",
+    "info",
+    "warning",
+    "error",
+    "critical",
+    "configure_logger",
+    "set_process_type",
+    "LogLevel",
+    "ConsoleHandler",
+    "RotatingFileHandler",
+    "MultiProcessLogger",
+    "LoggerCore",
 ]
 
 
@@ -56,11 +56,11 @@ def _register_lifecycle_listeners() -> None:
     try:
         from core.event.event_bus import EventBus
         from core.event.events.scheduler_events import ApplicationLifecycleEvent
-        
+
         def _on_application_lifecycle_event(event: Any) -> bool:
             """处理应用程序生命周期事件"""
             try:
-                if hasattr(event, 'lifecycle_stage'):
+                if hasattr(event, "lifecycle_stage"):
                     if event.lifecycle_stage in ("stopping", "stopped"):
                         # 关闭所有日志处理器
                         manager = _get_logger_manager()
@@ -72,22 +72,24 @@ def _register_lifecycle_listeners() -> None:
             except Exception as e:
                 # 确保sys可用
                 import sys
+
                 print(f"Error in logger lifecycle handler: {e}", file=sys.stderr)
                 return False
-        
+
         event_bus = EventBus()
         event_bus.subscribe_lambda(
             ApplicationLifecycleEvent.EVENT_TYPE,
             _on_application_lifecycle_event,
-            "logger_lifecycle_handler"
+            "logger_lifecycle_handler",
         )
-        
+
     except ImportError:
         # 如果事件系统不可用，跳过事件监听器注册
         pass
     except Exception as e:
         # 确保sys可用
         import sys
+
         print(f"Failed to register logger lifecycle listeners: {e}", file=sys.stderr)
 
 
@@ -97,11 +99,12 @@ def _get_current_logger() -> LoggerCore:
         manager = _get_logger_manager()
         # 这里可以根据实际的进程环境自动检测进程类型
         # 为了简化，我们使用环境变量或默认为主进程
-        process_type = os.getenv('LOG_PROCESS_TYPE', 'main')
+        process_type = os.getenv("LOG_PROCESS_TYPE", "main")
         return manager.get_logger(process_type)
     except Exception as e:
         # 如果获取日志器失败，创建一个简单的备用日志器
         import sys
+
         print(f"Warning: Failed to get logger, using fallback: {e}", file=sys.stderr)
         # 返回一个简单的日志器实例，避免完全失败
         fallback_logger = LoggerCore(name="fallback", level=LogLevel.WARNING)
@@ -112,11 +115,11 @@ def configure_logger(
     level: LogLevel = LogLevel.DEBUG,
     console: bool = True,
     log_dir: Optional[str] = None,
-    process_type: Optional[str] = None
+    process_type: Optional[str] = None,
 ) -> None:
     """
     配置logger
-    
+
     Args:
         level: 日志级别
         console: 是否启用控制台输出
@@ -124,30 +127,26 @@ def configure_logger(
         process_type: 进程类型 ("main", "renderer", "extension")，如果为None则配置所有进程类型
     """
     manager = _get_logger_manager()
-    
+
     # 如果没有指定日志目录，使用项目根目录下的logs目录
     if log_dir is None:
-        log_dir = _join_paths(_get_project_root(), 'logs')
-    
+        log_dir = _join_paths(_get_project_root(), "logs")
+
     if process_type is None:
         # 配置所有进程类型
-        manager.configure_all_loggers(
-            level=level,
-            console=console,
-            log_dir=log_dir
-        )
+        manager.configure_all_loggers(level=level, console=console, log_dir=log_dir)
     else:
         # 配置特定进程类型
         logger = manager.get_logger(process_type)
         logger.set_level(level)
-        
+
         # 清除现有处理器
         logger.handlers.clear()
-        
+
         # 添加控制台处理器
         if console:
             logger.add_handler(ConsoleHandler(level=level))
-        
+
         # 添加文件处理器
         if log_dir:
             log_path = _join_paths(log_dir, "app.log")
@@ -157,7 +156,7 @@ def configure_logger(
                 level=level,
                 max_bytes=100 * 1024 * 1024,  # 100MB
                 backup_count=7,  # 保留7天
-                rotate_by_date=True
+                rotate_by_date=True,
             )
             logger.add_handler(file_handler)
 
@@ -165,11 +164,11 @@ def configure_logger(
 def set_process_type(process_type: str) -> None:
     """
     设置当前进程类型
-    
+
     Args:
         process_type: 进程类型 ("main", "renderer", "extension")
     """
-    os.environ['LOG_PROCESS_TYPE'] = process_type
+    os.environ["LOG_PROCESS_TYPE"] = process_type
     manager = _get_logger_manager()
     manager.set_default_process(process_type)
 
@@ -203,10 +202,12 @@ def critical(message: str, extra: Optional[Dict[str, Any]] = None) -> None:
 # 移除顶层的configure_logger()调用，避免模块导入时立即执行初始化
 # 根据项目规范，日志配置应在主程序入口统一执行
 
+
 # 注册退出清理
 def _cleanup():
     """清理资源"""
     global _logger_manager
     _logger_manager = None
+
 
 atexit.register(_cleanup)

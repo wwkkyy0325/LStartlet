@@ -13,12 +13,13 @@ PATH_CONSTANTS: Dict[str, str] = {
     "LOG_DIR": "logs",
     "DATA_DIR": "data",
     "OUTPUT_DIR": "output",
-    "TEMP_DIR": "temp"
+    "TEMP_DIR": "temp",
 }
 
 # 配置验证规则
 CONFIG_VALIDATORS: Dict[str, Callable[[Any], bool]] = {
-    "log_level": lambda x: isinstance(x, str) and x.upper() in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"},
+    "log_level": lambda x: isinstance(x, str)
+    and x.upper() in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"},
     "debug_mode": lambda x: isinstance(x, bool),
-    "config_file": lambda x: isinstance(x, str)
+    "config_file": lambda x: isinstance(x, str),
 }

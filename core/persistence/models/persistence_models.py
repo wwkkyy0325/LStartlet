@@ -10,13 +10,13 @@ from datetime import datetime
 @dataclass
 class StorageItem:
     """存储项模型"""
-    
+
     key: str
     value: Any
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)  # type: ignore
-    
+
     def update_value(self, new_value: Any) -> None:
         """更新值并更新时间戳"""
         self.value = new_value
@@ -26,7 +26,7 @@ class StorageItem:
 @dataclass
 class StorageConfig:
     """存储配置模型"""
-    
+
     name: str
     storage_type: str = "file"  # "file", "memory", "database"
     path: str = ""
@@ -40,7 +40,7 @@ class StorageConfig:
 @dataclass
 class TransactionRecord:
     """事务记录模型"""
-    
+
     transaction_id: str
     operations: Any = field(default_factory=list)  # type: ignore
     timestamp: datetime = field(default_factory=datetime.now)

@@ -6,7 +6,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 # 读取requirements.txt
 with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+    requirements = [
+        line.strip() for line in fh if line.strip() and not line.startswith("#")
+    ]
 
 setup(
     name="LStartlet",
@@ -17,7 +19,16 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/wwkkyy0325/LStartlet",
-    packages=find_packages(exclude=["tests*", "test_reports*", "build*", "deployment*", "plugin.example_ocr_plugin", "plugin.example_ocr_plugin.*"]),
+    packages=find_packages(
+        exclude=[
+            "tests*",
+            "test_reports*",
+            "build*",
+            "deployment*",
+            "plugin.example_ocr_plugin",
+            "plugin.example_ocr_plugin.*",
+        ]
+    ),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

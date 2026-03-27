@@ -5,6 +5,7 @@ from datetime import datetime
 
 class LogLevel(IntEnum):
     """日志级别枚举"""
+
     DEBUG = 10
     INFO = 20
     WARNING = 30
@@ -14,6 +15,7 @@ class LogLevel(IntEnum):
 
 class LogRecord(NamedTuple):
     """日志记录数据结构"""
+
     level: LogLevel
     message: str
     timestamp: datetime
