@@ -6,7 +6,29 @@ from LStartlet.core.logger import error
 
 @dataclass
 class CommandMetadata:
-    """命令元数据"""
+    """
+    命令元数据
+    
+    定义命令的基本信息和执行约束，用于命令注册、验证和管理。
+    
+    Attributes:
+        name (str): 命令名称，必须唯一
+        description (str): 命令描述，默认为空字符串
+        category (str): 命令分类，默认为 "general"
+        version (str): 命令版本号，默认为 "1.0.0"
+        author (str): 命令作者，默认为空字符串
+        parameters (Dict[str, Any]): 命令参数定义，默认为空字典
+        requires_confirmation (bool): 是否需要用户确认，默认为 False
+        timeout (float): 命令执行超时时间（秒），默认为 30.0
+        
+    Example:
+        >>> metadata = CommandMetadata(
+        ...     name="backup",
+        ...     description="Create system backup",
+        ...     category="system",
+        ...     timeout=60.0
+        ... )
+    """
 
     name: str
     description: str = ""
@@ -19,7 +41,22 @@ class CommandMetadata:
 
 
 class CommandResult:
-    """命令执行结果"""
+    """
+    命令执行结果
+    
+    封装命令执行的结果信息，包括成功/失败状态、消息、数据和错误信息。
+    
+    Attributes:
+        is_success (bool): 命令是否成功执行
+        message (str): 执行结果消息
+        data (Optional[Dict[str, Any]]): 执行结果数据，默认为 None
+        error (Optional[Exception]): 执行过程中发生的错误，默认为 None
+        
+    Example:
+        >>> result = CommandResult.success("Operation completed", {"result": "data"})
+        >>> assert result.is_success is True
+        >>> assert result.data["result"] == "data"
+    """
 
     def __init__(
         self,
@@ -27,7 +64,19 @@ class CommandResult:
         message: str = "",
         data: Optional[Dict[str, Any]] = None,
         error: Optional[Exception] = None,
-    ):
+    ) -> None:
+        """
+        初始化命令执行结果
+        
+        Args:
+            is_success (bool): 命令是否成功执行
+            message (str): 执行结果消息，默认为空字符串
+            data (Optional[Dict[str, Any]]): 执行结果数据，默认为 None
+            error (Optional[Exception]): 执行过程中发生的错误，默认为 None
+            
+        Example:
+            >>> result = CommandResult(True, "Success", {"key": "value"})
+        """
         self.is_success = is_success
         self.message = message
         self.data = data
@@ -39,58 +88,169 @@ class CommandResult:
         message: str = "Command executed successfully",
         data: Optional[Dict[str, Any]] = None,
     ) -> "CommandResult":
+        """
+        创建成功的命令执行结果
+        
+        Args:
+            message (str): 成功消息，默认为 "Command executed successfully"
+            data (Optional[Dict[str, Any]]): 成功结果数据，默认为 None
+            
+        Returns:
+            CommandResult: 成功的命令执行结果实例
+            
+        Example:
+            >>> result = CommandResult.success("Backup created", {"path": "/backup/file"})
+        """
         return cls(is_success=True, message=message, data=data)
 
     @classmethod
     def failure(
         cls, message: str, error: Optional[Exception] = None
     ) -> "CommandResult":
+        """
+        创建失败的命令执行结果
+        
+        Args:
+            message (str): 失败消息
+            error (Optional[Exception]): 相关异常，默认为 None
+            
+        Returns:
+            CommandResult: 失败的命令执行结果实例
+            
+        Example:
+            >>> result = CommandResult.failure("File not found", FileNotFoundError())
+        """
         return cls(is_success=False, message=message, error=error)
 
 
 class BaseCommand(ABC):
-    """命令基类"""
+    """
+    命令基类
+    
+    所有具体命令实现都必须继承此类，提供统一的命令接口和生命周期管理。
+    
+    Attributes:
+        metadata (CommandMetadata): 命令元数据
+        _is_executing (bool): 命令是否正在执行
+        
+    Lifecycle:
+        1. 实例化 (__init__)
+        2. 参数验证 (validate_parameters)
+        3. 执行 (execute)
+        4. 状态查询 (is_executing property)
+        
+    Example:
+        >>> class HelloWorldCommand(BaseCommand):
+        ...     def __init__(self):
+        ...         metadata = CommandMetadata(name="hello", description="Say hello")
+        ...         super().__init__(metadata)
+        ...     
+        ...     def execute(self, **kwargs) -> CommandResult:
+        ...         name = kwargs.get("name", "World")
+        ...         return CommandResult.success(f"Hello, {name}!")
+        ...
+        >>> cmd = HelloWorldCommand()
+        >>> result = cmd.execute(name="Alice")
+    """
 
-    def __init__(self, metadata: CommandMetadata):
+    def __init__(self, metadata: CommandMetadata) -> None:
+        """
+        初始化命令基类
+        
+        Args:
+            metadata (CommandMetadata): 命令元数据
+            
+        Example:
+            >>> metadata = CommandMetadata(name="test", description="Test command")
+            >>> command = BaseCommand(metadata)  # 实际使用时应继承BaseCommand
+        """
         self.metadata = metadata
         self._is_executing = False
 
     @property
     def name(self) -> str:
-        """获取命令名称"""
+        """
+        获取命令名称
+        
+        Returns:
+            str: 命令名称
+            
+        Example:
+            >>> metadata = CommandMetadata(name="backup")
+            >>> command = BaseCommand(metadata)
+            >>> assert command.name == "backup"
+        """
         return self.metadata.name
 
     @property
     def is_executing(self) -> bool:
-        """检查命令是否正在执行"""
+        """
+        检查命令是否正在执行
+        
+        Returns:
+            bool: 如果命令正在执行返回 True，否则返回 False
+            
+        Example:
+            >>> command = BaseCommand(CommandMetadata(name="test"))
+            >>> assert not command.is_executing
+        """
         return self._is_executing
 
     def set_executing(self, executing: bool) -> None:
-        """设置命令执行状态"""
+        """
+        设置命令执行状态
+        
+        Args:
+            executing (bool): 执行状态，True 表示正在执行
+            
+        Example:
+            >>> command = BaseCommand(CommandMetadata(name="test"))
+            >>> command.set_executing(True)
+            >>> assert command.is_executing
+        """
         self._is_executing = executing
 
     @abstractmethod
     def execute(self, **kwargs: Any) -> CommandResult:
         """
         执行命令
-
+        
+        子类必须实现此方法来定义具体的命令逻辑。
+        
         Args:
-            **kwargs: 命令参数 (Dict[str, Any])
-
+            **kwargs (Dict[str, Any]): 命令参数
+            
         Returns:
             CommandResult: 命令执行结果
+            
+        Raises:
+            NotImplementedError: 如果子类未实现此方法
+            
+        Example:
+            >>> class MyCommand(BaseCommand):
+            ...     def execute(self, **kwargs) -> CommandResult:
+            ...         return CommandResult.success("Executed")
         """
         pass
 
     def validate_parameters(self, **kwargs: Any) -> bool:
         """
         验证命令参数
-
+        
+        检查必需参数是否存在，并记录验证失败的日志。
+        
         Args:
-            **kwargs: 命令参数 (Dict[str, Any])
-
+            **kwargs (Dict[str, Any]): 命令参数
+            
         Returns:
-            bool: 参数是否有效
+            bool: 如果所有必需参数都存在返回 True，否则返回 False
+            
+        Example:
+            >>> metadata = CommandMetadata(name="test")
+            >>> metadata.parameters = {"required": ["name"]}
+            >>> command = BaseCommand(metadata)
+            >>> assert command.validate_parameters(name="test") is True
+            >>> assert command.validate_parameters() is False
         """
         # 基础参数验证逻辑
         required_params = self.metadata.parameters.get("required", [])
@@ -101,7 +261,28 @@ class BaseCommand(ABC):
         return True
 
     def __str__(self) -> str:
+        """
+        返回命令的字符串表示
+        
+        Returns:
+            str: 命令的字符串表示
+            
+        Example:
+            >>> command = BaseCommand(CommandMetadata(name="test"))
+            >>> assert str(command) == "Command(test)"
+        """
         return f"Command({self.name})"
 
     def __repr__(self) -> str:
+        """
+        返回命令的详细字符串表示
+        
+        Returns:
+            str: 命令的详细字符串表示
+            
+        Example:
+            >>> metadata = CommandMetadata(name="test", category="system")
+            >>> command = BaseCommand(metadata)
+            >>> assert "Command(name='test', category='system')" in repr(command)
+        """
         return f"Command(name='{self.name}', category='{self.metadata.category}')"

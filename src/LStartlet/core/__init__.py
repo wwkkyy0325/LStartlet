@@ -33,6 +33,13 @@ from .command import (
     CommandFailedEvent,
     CommandCancelledEvent,
 )
+# 命令系统 - 具体命令实现
+from .command.commands import (
+    EchoCommand,
+    ShutdownCommand,
+    ClearCacheCommand,
+    SystemInfoCommand,
+)
 
 # 配置系统
 from .config import (
@@ -85,6 +92,29 @@ from .event import (
     EventBus,
     event_bus,
 )
+# 事件系统 - 具体事件类型
+from .event.events.scheduler_events import (
+    SchedulerStatusEvent,
+    ApplicationLifecycleEvent,
+    ConfigItemRegisteredEvent,
+    TaskSubmittedEvent,
+    TaskStartedEvent,
+    TaskCompletedEvent,
+    TaskFailedEvent,
+    ProcessCreatedEvent,
+    ProcessStartedEvent,
+    ProcessStoppedEvent,
+    ProcessFailedEvent,
+    TickEvent,
+)
+from .event.events.ui_events import (
+    UIStyleUpdateEvent,
+    UIConfigChangeEvent,
+    UIStateChangeEvent,
+    UIMountAreaEvent,
+    UIComponentLifecycleEvent,
+    RenderProcessReadyEvent,
+)
 
 # 日志系统
 from .logger import (
@@ -107,6 +137,13 @@ from .path import PathManager, get_project_root, join_paths
 
 # 持久化
 from .persistence import PersistenceManager, initialize_persistence_system
+# 持久化 - 模型和存储
+from .persistence.models.persistence_models import (
+    StorageItem,
+    StorageConfig,
+    TransactionRecord,
+)
+from .persistence.storage.kv_storage import KVStorage
 
 # 进程管理
 from .process import GlobalProcessManager, ProcessInfo
@@ -174,6 +211,11 @@ __all__ = [
     "CommandCompletedEvent",
     "CommandFailedEvent",
     "CommandCancelledEvent",
+    # 具体命令实现
+    "EchoCommand",
+    "ShutdownCommand",
+    "ClearCacheCommand",
+    "SystemInfoCommand",
     # 配置系统
     "ConfigManager",
     "get_config",
@@ -214,6 +256,26 @@ __all__ = [
     "CompositeEventHandler",
     "EventBus",
     "event_bus",
+    # 调度器事件
+    "SchedulerStatusEvent",
+    "ApplicationLifecycleEvent",
+    "ConfigItemRegisteredEvent",
+    "TaskSubmittedEvent",
+    "TaskStartedEvent",
+    "TaskCompletedEvent", 
+    "TaskFailedEvent",
+    "ProcessCreatedEvent",
+    "ProcessStartedEvent",
+    "ProcessStoppedEvent",
+    "ProcessFailedEvent",
+    "TickEvent",
+    # UI事件
+    "UIStyleUpdateEvent",
+    "UIConfigChangeEvent",
+    "UIStateChangeEvent",
+    "UIMountAreaEvent",
+    "UIComponentLifecycleEvent",
+    "RenderProcessReadyEvent",
     # 日志系统
     "MultiProcessLogger",
     "LoggerCore",
@@ -234,6 +296,11 @@ __all__ = [
     # 持久化
     "PersistenceManager",
     "initialize_persistence_system",
+    # 持久化模型和存储
+    "StorageItem",
+    "StorageConfig",
+    "TransactionRecord",
+    "KVStorage",
     # 进程管理
     "GlobalProcessManager",
     "ProcessInfo",

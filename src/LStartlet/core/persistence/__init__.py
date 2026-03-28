@@ -5,8 +5,21 @@
 from LStartlet.core.persistence.persistence_manager import PersistenceManager
 from LStartlet.core.di import ServiceContainer
 from LStartlet.core.di.service_descriptor import ServiceLifetime
+from LStartlet.core.persistence.models.persistence_models import (
+    StorageItem,
+    StorageConfig,
+    TransactionRecord,
+)
+from LStartlet.core.persistence.storage.kv_storage import KVStorage
 
-__all__ = ["initialize_persistence_system", "PersistenceManager"]
+__all__ = [
+    "initialize_persistence_system", 
+    "PersistenceManager",
+    "StorageItem",
+    "StorageConfig", 
+    "TransactionRecord",
+    "KVStorage",
+]
 
 
 def initialize_persistence_system(

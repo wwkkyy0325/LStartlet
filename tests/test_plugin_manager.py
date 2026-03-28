@@ -50,7 +50,22 @@ class MockPlugin(PluginBase):
     def _on_stop(self) -> bool:
         return True
 
-    def _on_cleanup(self) -> bool:
+    def initialize(self) -> bool:
+        """Initialize the plugin"""
+        return True
+
+    def start(self) -> bool:
+        """Start the plugin"""
+        self._is_started = True
+        return True
+
+    def stop(self) -> bool:
+        """Stop the plugin"""
+        self._is_started = False
+        return True
+
+    def cleanup(self) -> bool:
+        """Cleanup the plugin"""
         return True
 
 
