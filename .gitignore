@@ -97,3 +97,4 @@ src/LStartlet/deployment/*
 .pypirc
 */__pycache__/*
 *.pyc
+.coveragerc

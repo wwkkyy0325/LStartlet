@@ -36,10 +36,7 @@ __all__ = [
     "LogLevel",
     "ConsoleHandler",
     "RotatingFileHandler",
-    "MultiProcessLogger",
-    "LoggerCore",
 ]
-
 
 def _get_logger_manager() -> MultiProcessLogger:
     """获取全局logger管理器"""

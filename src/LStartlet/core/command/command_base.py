@@ -1,7 +1,30 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union, ClassVar, Callable
 from dataclasses import dataclass, field
 from LStartlet.core.logger import error
+
+
+@dataclass
+class CommandParameter:
+    """
+    命令参数定义
+    
+    定义单个命令参数的约束和验证规则。
+    
+    Attributes:
+        name (str): 参数名称
+        required (bool): 是否必需，默认为False
+        type_hint (Optional[type]): 类型提示，默认为None
+        default (Any): 默认值，默认为None
+        description (str): 参数描述，默认为空字符串
+        validator (Optional[Callable]): 自定义验证函数，默认为None
+    """
+    name: str
+    required: bool = False
+    type_hint: Optional[type] = None
+    default: Any = None
+    description: str = ""
+    validator: Optional[Callable] = None
 
 
 @dataclass
@@ -17,7 +40,7 @@ class CommandMetadata:
         category (str): 命令分类，默认为 "general"
         version (str): 命令版本号，默认为 "1.0.0"
         author (str): 命令作者，默认为空字符串
-        parameters (Dict[str, Any]): 命令参数定义，默认为空字典
+        parameters (List[CommandParameter]): 命令参数定义列表，默认为空列表
         requires_confirmation (bool): 是否需要用户确认，默认为 False
         timeout (float): 命令执行超时时间（秒），默认为 30.0
         
@@ -35,7 +58,7 @@ class CommandMetadata:
     category: str = "general"
     version: str = "1.0.0"
     author: str = ""
-    parameters: Dict[str, Any] = field(default_factory=lambda: {})
+    parameters: List[CommandParameter] = field(default_factory=list)
     requires_confirmation: bool = False
     timeout: float = 30.0  # 默认30秒超时
 
@@ -128,10 +151,12 @@ class BaseCommand(ABC):
     命令基类
     
     所有具体命令实现都必须继承此类，提供统一的命令接口和生命周期管理。
+    支持自动元数据注入，简化用户实现。
     
     Attributes:
         metadata (CommandMetadata): 命令元数据
         _is_executing (bool): 命令是否正在执行
+        _command_metadata (ClassVar[Optional[CommandMetadata]]): 装饰器设置的元数据（类属性）
         
     Lifecycle:
         1. 实例化 (__init__)
@@ -141,10 +166,6 @@ class BaseCommand(ABC):
         
     Example:
         >>> class HelloWorldCommand(BaseCommand):
-        ...     def __init__(self):
-        ...         metadata = CommandMetadata(name="hello", description="Say hello")
-        ...         super().__init__(metadata)
-        ...     
         ...     def execute(self, **kwargs) -> CommandResult:
         ...         name = kwargs.get("name", "World")
         ...         return CommandResult.success(f"Hello, {name}!")
@@ -152,19 +173,31 @@ class BaseCommand(ABC):
         >>> cmd = HelloWorldCommand()
         >>> result = cmd.execute(name="Alice")
     """
+    
+    # 类级别属性声明，用于装饰器设置
+    _command_metadata: ClassVar[Optional[CommandMetadata]] = None
 
-    def __init__(self, metadata: CommandMetadata) -> None:
+    def __init__(self, metadata: Optional[CommandMetadata] = None) -> None:
         """
         初始化命令基类
         
         Args:
-            metadata (CommandMetadata): 命令元数据
+            metadata (Optional[CommandMetadata]): 命令元数据，如果为None则尝试从类属性获取
             
         Example:
-            >>> metadata = CommandMetadata(name="test", description="Test command")
-            >>> command = BaseCommand(metadata)  # 实际使用时应继承BaseCommand
+            >>> command = BaseCommand()  # 自动使用装饰器设置的元数据
         """
-        self.metadata = metadata
+        # 优先使用传入的metadata，否则尝试从类属性获取
+        if metadata is not None:
+            self.metadata = metadata
+        elif self._command_metadata is not None:
+            self.metadata = self._command_metadata
+        else:
+            # 如果都没有，创建默认元数据
+            class_name = self.__class__.__name__
+            default_name = class_name.lower().replace("command", "")
+            self.metadata = CommandMetadata(name=default_name)
+        
         self._is_executing = False
 
     @property
@@ -237,27 +270,46 @@ class BaseCommand(ABC):
         """
         验证命令参数
         
-        检查必需参数是否存在，并记录验证失败的日志。
+        使用CommandParameter定义进行智能参数验证。
         
         Args:
             **kwargs (Dict[str, Any]): 命令参数
             
         Returns:
-            bool: 如果所有必需参数都存在返回 True，否则返回 False
+            bool: 如果所有参数验证通过返回 True，否则返回 False
             
         Example:
             >>> metadata = CommandMetadata(name="test")
-            >>> metadata.parameters = {"required": ["name"]}
+            >>> param = CommandParameter(name="name", required=True)
+            >>> metadata.parameters = [param]
             >>> command = BaseCommand(metadata)
             >>> assert command.validate_parameters(name="test") is True
             >>> assert command.validate_parameters() is False
         """
-        # 基础参数验证逻辑
-        required_params = self.metadata.parameters.get("required", [])
-        for param in required_params:
-            if param not in kwargs:
-                error(f"Missing required parameter: {param} for command {self.name}")
+        for param_def in self.metadata.parameters:
+            param_value = kwargs.get(param_def.name)
+            
+            # 检查必需参数
+            if param_def.required and param_value is None:
+                error(f"Missing required parameter: {param_def.name} for command {self.name}")
                 return False
+            
+            # 检查类型（如果指定了类型提示）
+            if param_def.type_hint is not None and param_value is not None:
+                if not isinstance(param_value, param_def.type_hint):
+                    error(f"Parameter {param_def.name} must be of type {param_def.type_hint.__name__}, got {type(param_value).__name__}")
+                    return False
+            
+            # 执行自定义验证器
+            if param_def.validator is not None and param_value is not None:
+                try:
+                    if not param_def.validator(param_value):
+                        error(f"Parameter {param_def.name} failed custom validation")
+                        return False
+                except Exception as e:
+                    error(f"Custom validator for parameter {param_def.name} failed: {str(e)}")
+                    return False
+        
         return True
 
     def __str__(self) -> str:

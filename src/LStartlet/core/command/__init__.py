@@ -1,27 +1,16 @@
 """
 命令系统公共API
+
+提供命令系统的核心抽象接口和数据类型，用户应继承 BaseCommand 
+并使用 register_command 装饰器来定义和注册自定义命令。
 """
 
-from .command_base import BaseCommand, CommandResult, CommandMetadata
-from .command_executor import CommandExecutor
-from .command_registry import CommandRegistry, command_registry
-from .command_events import (
-    CommandExecutionEvent,
-    CommandCompletedEvent,
-    CommandFailedEvent,
-    CommandCancelledEvent,
-)
+from .command_base import BaseCommand, CommandResult, CommandMetadata, CommandParameter
 
-# 定义公共API
+# 定义公共API - 仅暴露抽象接口、数据类型
 __all__ = [
     "BaseCommand",
-    "CommandResult",
+    "CommandResult", 
     "CommandMetadata",
-    "CommandExecutor",
-    "CommandRegistry",
-    "command_registry",
-    "CommandExecutionEvent",
-    "CommandCompletedEvent",
-    "CommandFailedEvent",
-    "CommandCancelledEvent",
+    "CommandParameter",
 ]

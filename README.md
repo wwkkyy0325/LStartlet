@@ -90,9 +90,11 @@ scheduler = Scheduler()
 ### Decorators & Utilities
 - **Error Handling**: `with_error_handling`, `with_error_handling_async`
 - **Logging**: `with_logging`, `with_logging_async`
-- **Caching**: `cached_async`
+- **Caching**: `cached_async`, `cached`
 - **Permissions**: `require_permission`, `require_permission_async`, `PermissionLevel`
 - **Metrics**: `monitor_metrics`, `monitor_metrics_async`, `MetricsCollector`
+- **Service Registration**: `auto_register`
+- **Plugin Registration**: `auto_plugin_register`
 
 ## Usage Examples
 
@@ -160,6 +162,98 @@ class MyPlugin(PluginBase):
         print(f"{self.name} activated")
 ```
 
+### Automatic Service Registration
+```python
+from LStartlet import auto_register, ServiceLifetime, get_default_container
+
+# Register as self-type service (TRANSIENT lifecycle)
+@auto_register()
+class EmailService:
+    def send_email(self, to: str, subject: str, body: str):
+        print(f"Sending email to {to}: {subject}")
+
+# Register as interface service (SINGLETON lifecycle)
+from abc import ABC, abstractmethod
+
+class NotificationService(ABC):
+    @abstractmethod
+    def notify(self, message: str):
+        pass
+
+@auto_register(service_type=NotificationService, lifetime=ServiceLifetime.SINGLETON)
+class EmailNotificationService(NotificationService):
+    def notify(self, message: str):
+        print(f"Email notification: {message}")
+
+# Services are automatically registered and can be resolved
+container = get_default_container()
+email_service = container.resolve(EmailService)
+notification_service = container.resolve(NotificationService)
+```
+
+### Automatic Plugin Registration
+```python
+from LStartlet import auto_plugin_register, PluginBase, get_default_container
+
+# Automatically register a plugin with metadata and dependencies
+@auto_plugin_register(
+    plugin_id="com.example.email",
+    name="Email Plugin",
+    version="1.0.0",
+    description="Handles email notifications",
+    order=10,
+    dependencies={"core.logger": ">=1.0.0"},
+    lifetime=ServiceLifetime.SINGLETON
+)
+class EmailPlugin(PluginBase):
+    def __init__(self):
+        # Must call parent constructor with the same parameters
+        super().__init__(
+            plugin_id="com.example.email",
+            name="Email Plugin",
+            version="1.0.0",
+            description="Handles email notifications"
+        )
+    
+    def initialize(self) -> None:
+        print(f"{self.name} initialized")
+    
+    def start(self) -> None:
+        print(f"{self.name} started")
+    
+    def stop(self) -> None:
+        print(f"{self.name} stopped")
+    
+    def cleanup(self) -> None:
+        print(f"{self.name} cleaned up")
+
+# Plugin is automatically registered and can be resolved
+container = get_default_container()
+email_plugin = container.resolve(EmailPlugin)
+```
+
+### Automatic Command Registration
+```python
+from LStartlet import command, BaseCommand, CommandResult
+
+@command(name="echo", description="回显输入的消息", category="utility")
+class EchoCommand(BaseCommand):
+    def __init__(self):
+        # 必须调用父类构造函数并传入装饰器设置的元数据
+        super().__init__(self._command_metadata)
+    
+    def execute(self, **kwargs: Any) -> CommandResult:
+        message = kwargs.get("message", "")
+        if not message:
+            return CommandResult(False, "message parameter is required")
+        return CommandResult(True, f"Echo: {message}", {"original_message": message})
+
+# 命令会自动注册到全局命令注册表中
+from LStartlet.core.command import command_registry
+echo_cmd = command_registry.get_command("echo")
+result = echo_cmd.execute(message="Hello World")
+```
+
 ## Installation
 
 ```bash
@@ -189,6 +283,108 @@ python tests/run_tests.py
 - **Type Safety**: Strong typing with runtime validation where appropriate
 - **Extensibility**: Plugin system for adding custom functionality without modifying core code
 - **Cross-Platform**: Windows-optimized with WSL compatibility
+
+## 核心特性
+
+### 1. 统一注册装饰器系统
+
+LStartlet 提供了一套统一的装饰器系统，用于自动注册服务、插件和命令，大大简化了框架的使用。
+
+#### 服务注册装饰器
+
+```python
+from LStartlet import register_service, ServiceLifetime
+
+# 基本用法 - 自动注册为 TRANSIENT 服务
+@register_service()
+class EmailService:
+    def send_email(self, message: str):
+        print(f"Sending email: {message}")
+
+# 指定接口和服务实现
+class NotificationService:
+    def notify(self, message: str):
+        pass
+
+@register_service(service_type=NotificationService, lifetime=ServiceLifetime.SINGLETON)
+class EmailNotificationService(NotificationService):
+    def notify(self, message: str):
+        print(f"Email notification: {message}")
+```
+
+#### 插件注册装饰器
+
+```python
+from LStartlet import register_plugin, PluginBase
+
+@register_plugin(
+    plugin_id="com.example.email",
+    name="Email Plugin", 
+    version="1.0.0",
+    description="Handles email notifications",
+    order=10,
+    dependencies={"core.logger": ">=1.0.0"}
+)
+class EmailPlugin(PluginBase):
+    def __init__(self):
+        super().__init__(
+            plugin_id="com.example.email",
+            name="Email Plugin",
+            version="1.0.0",
+            description="Handles email notifications"
+        )
+    
+    def initialize(self) -> None:
+        print("Email plugin initialized")
+    
+    def start(self) -> None:
+        print("Email plugin started")
+    
+    def stop(self) -> None:
+        print("Email plugin stopped")
+    
+    def cleanup(self) -> None:
+        print("Email plugin cleaned up")
+```
+
+#### 命令注册装饰器
+
+```python
+from LStartlet import register_command, BaseCommand, CommandResult
+
+@register_command(
+    name="send_email",
+    description="Send an email message",
+    category="communication",
+    timeout=30.0
+)
+class SendEmailCommand(BaseCommand):
+    def __init__(self):
+        super().__init__(self._command_metadata)
+    
+    def execute(self, recipient: str, subject: str, body: str) -> CommandResult:
+        # 执行发送邮件的逻辑
+        print(f"Sending email to {recipient}: {subject}")
+        return CommandResult(is_success=True, data="Email sent successfully")
+```
+
+#### 向后兼容性
+
+为了保持向后兼容，LStartlet 仍然支持原有的装饰器：
+
+- `auto_register` - 等同于 `register_service`
+- `auto_plugin_register` - 等同于 `register_plugin`  
+- `register_command_decorator` - 等同于 `register_command`
+
+### 2. 统一的入参格式
+
+所有注册装饰器都遵循统一的入参格式：
+
+- **基本用法**: `@decorator()` - 使用默认配置
+- **自定义配置**: `@decorator(param1=value1, param2=value2)` - 指定具体参数
+- **内部处理**: 装饰器内部自动处理具体的注册逻辑，用户只需关注业务实现
+
+这种统一的设计使得框架更加易用和一致，符合高内聚低耦合的设计原则.
 
 ## License
 

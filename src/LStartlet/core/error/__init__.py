@@ -7,19 +7,24 @@ from typing import Dict, Any, Optional
 from .error_handler import ErrorHandler, register_global_error_handler  # type: ignore
 from .formatter import ErrorFormatter
 
-# 创建全局错误处理器实例
-error_handler: ErrorHandler = ErrorHandler()
+# 内部全局错误处理器实例（不对外暴露）
+_error_handler_instance: ErrorHandler = ErrorHandler()
 
 __all__ = [
     "handle_error",
-    "format_error",
+    "format_error", 
     "log_error",
     "get_error_info",
     "ErrorHandler",
     "register_global_error_handler",
     "ErrorFormatter",
-    "error_handler",
+    "get_error_handler",  # 新增获取函数替代全局实例
 ]
+
+
+def get_error_handler() -> ErrorHandler:
+    """获取全局错误处理器实例"""
+    return _error_handler_instance
 
 
 # 对外暴露的核心接口
@@ -27,7 +32,7 @@ def handle_error(
     exception: Exception, context: Optional[Dict[str, Any]] = None
 ) -> bool:
     """处理错误"""
-    return error_handler.handle_error(exception, context)
+    return _error_handler_instance.handle_error(exception, context)
 
 
 def format_error(exception: Exception, include_traceback: bool = True) -> str:
@@ -37,7 +42,7 @@ def format_error(exception: Exception, include_traceback: bool = True) -> str:
 
 def log_error(exception: Exception, context: Optional[Dict[str, Any]] = None) -> None:
     """记录错误日志"""
-    error_handler.log_error(exception, context)
+    _error_handler_instance.log_error(exception, context)
 
 
 def get_error_info(exception: Exception) -> Dict[str, Any]:

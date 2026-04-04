@@ -1,23 +1,53 @@
 """Core module exports"""
 
-# 装饰器
+# 装饰器 - 导入所有实际存在的装饰器
 from .decorators import (
+    # 错误处理装饰器
     with_error_handling,
-    with_logging,
-    plugin_component,
-    plugin_event_handler,
-    # 异步装饰器
     with_error_handling_async,
+    
+    # 日志装饰器
+    with_logging,
     with_logging_async,
-    cached_async,
-    # 权限装饰器
+    log_calls,  # 新增增强型日志装饰器
+    
+    # 权限装饰器  
     require_permission,
     require_permission_async,
     PermissionLevel,
+    
+    # 缓存装饰器
+    cached,
+    cached_async,
+    
     # 监控装饰器
     monitor_metrics,
     monitor_metrics_async,
     MetricsCollector,
+    
+    # 配置装饰器
+    config,
+    
+    # 插件装饰器
+    plugin_component,
+    plugin_event_handler,
+    
+    # DI装饰器
+    service,
+    service_factory,
+    service_instance,
+    get_service,
+    auto_inject,
+    
+    # 事件装饰器
+    publish_event,
+)
+
+# 统一注册装饰器  
+from .register import (
+    register_service,
+    register_plugin,
+    register_command,
 )
 
 # 命令系统
@@ -25,47 +55,21 @@ from .command import (
     BaseCommand,
     CommandResult,
     CommandMetadata,
-    CommandExecutor,
-    CommandRegistry,
-    command_registry,
-    CommandExecutionEvent,
-    CommandCompletedEvent,
-    CommandFailedEvent,
-    CommandCancelledEvent,
-)
-# 命令系统 - 具体命令实现
-from .command.commands import (
-    EchoCommand,
-    ShutdownCommand,
-    ClearCacheCommand,
-    SystemInfoCommand,
 )
 
 # 配置系统
 from .config import (
-    ConfigManager,
     get_config,
     set_config,
-    has_config,
-    get_all_configs,
-    register_config,
-    add_config_listener,
-    remove_config_listener,
-    add_config_key_listener,
-    remove_config_key_listener,
-    save_config,
-    load_config,
-    reset_all_configs,
-    reset_config,
+    watch_config,
+    ConfigWatcher,
 )
 
 # 依赖注入系统
 from .di import (
     ServiceContainer,
     ServiceLifetime,
-    configure_default_container,
-    ServiceResolutionError,
-    ServiceRegistrationError,
+    get_default_container,
 )
 
 # 错误处理
@@ -77,7 +81,7 @@ from .error import (
     get_error_info,
     ErrorFormatter,
     register_global_error_handler,
-    error_handler,
+    get_error_handler,  # 替代 error_handler 全局实例
 )
 
 # 事件系统
@@ -91,29 +95,7 @@ from .event import (
     CompositeEventHandler,
     EventBus,
     event_bus,
-)
-# 事件系统 - 具体事件类型
-from .event.events.scheduler_events import (
-    SchedulerStatusEvent,
-    ApplicationLifecycleEvent,
-    ConfigItemRegisteredEvent,
-    TaskSubmittedEvent,
-    TaskStartedEvent,
-    TaskCompletedEvent,
-    TaskFailedEvent,
-    ProcessCreatedEvent,
-    ProcessStartedEvent,
-    ProcessStoppedEvent,
-    ProcessFailedEvent,
-    TickEvent,
-)
-from .event.events.ui_events import (
-    UIStyleUpdateEvent,
-    UIConfigChangeEvent,
-    UIStateChangeEvent,
-    UIMountAreaEvent,
-    UIComponentLifecycleEvent,
-    RenderProcessReadyEvent,
+    EventInterceptor,  # 新增
 )
 
 # 日志系统
@@ -183,152 +165,3 @@ from .cicd import (
     CICDController,
     DependencyInstaller,
 )
-
-# 明确导出的符号
-__all__ = [
-    # 装饰器
-    "with_error_handling",
-    "with_logging",
-    "plugin_component",
-    "plugin_event_handler",
-    "with_error_handling_async",
-    "with_logging_async",
-    "cached_async",
-    "require_permission",
-    "require_permission_async",
-    "PermissionLevel",
-    "monitor_metrics",
-    "monitor_metrics_async",
-    "MetricsCollector",
-    # 命令系统
-    "BaseCommand",
-    "CommandResult",
-    "CommandMetadata",
-    "CommandExecutor",
-    "CommandRegistry",
-    "command_registry",
-    "CommandExecutionEvent",
-    "CommandCompletedEvent",
-    "CommandFailedEvent",
-    "CommandCancelledEvent",
-    # 具体命令实现
-    "EchoCommand",
-    "ShutdownCommand",
-    "ClearCacheCommand",
-    "SystemInfoCommand",
-    # 配置系统
-    "ConfigManager",
-    "get_config",
-    "set_config",
-    "has_config",
-    "get_all_configs",
-    "register_config",
-    "add_config_listener",
-    "remove_config_listener",
-    "add_config_key_listener",
-    "remove_config_key_listener",
-    "save_config",
-    "load_config",
-    "reset_all_configs",
-    "reset_config",
-    # 依赖注入系统
-    "ServiceContainer",
-    "ServiceLifetime",
-    "configure_default_container",
-    "ServiceResolutionError",
-    "ServiceRegistrationError",
-    # 错误处理
-    "ErrorHandler",
-    "handle_error",
-    "format_error",
-    "log_error",
-    "get_error_info",
-    "ErrorFormatter",
-    "register_global_error_handler",
-    "error_handler",
-    # 事件系统
-    "BaseEvent",
-    "CancelableEvent",
-    "EventMetadata",
-    "EventTypeRegistry",
-    "EventHandler",
-    "LambdaEventHandler",
-    "CompositeEventHandler",
-    "EventBus",
-    "event_bus",
-    # 调度器事件
-    "SchedulerStatusEvent",
-    "ApplicationLifecycleEvent",
-    "ConfigItemRegisteredEvent",
-    "TaskSubmittedEvent",
-    "TaskStartedEvent",
-    "TaskCompletedEvent", 
-    "TaskFailedEvent",
-    "ProcessCreatedEvent",
-    "ProcessStartedEvent",
-    "ProcessStoppedEvent",
-    "ProcessFailedEvent",
-    "TickEvent",
-    # UI事件
-    "UIStyleUpdateEvent",
-    "UIConfigChangeEvent",
-    "UIStateChangeEvent",
-    "UIMountAreaEvent",
-    "UIComponentLifecycleEvent",
-    "RenderProcessReadyEvent",
-    # 日志系统
-    "MultiProcessLogger",
-    "LoggerCore",
-    "LogLevel",
-    "ConsoleHandler",
-    "RotatingFileHandler",
-    "configure_logger",
-    "set_process_type",
-    "debug",
-    "info",
-    "warning",
-    "error",
-    "critical",
-    # 路径管理
-    "PathManager",
-    "get_project_root",
-    "join_paths",
-    # 持久化
-    "PersistenceManager",
-    "initialize_persistence_system",
-    # 持久化模型和存储
-    "StorageItem",
-    "StorageConfig",
-    "TransactionRecord",
-    "KVStorage",
-    # 进程管理
-    "GlobalProcessManager",
-    "ProcessInfo",
-    # 调度器
-    "Scheduler",
-    "SchedulerProcessManager",
-    "TaskDispatcher",
-    "SchedulerConfigManager",
-    "SchedulerFactory",
-    "TickComponent",
-    "TickConfig",
-    "SimpleThreadScheduler",
-    "ThreadSafeScheduler",
-    # 系统检测
-    "SystemDetector",
-    "SystemConfigManager",
-    # 版本控制
-    "VersionController",
-    "ChangeAnalyzer",
-    "IncrementalPackageGenerator",
-    "DependencyResolver",
-    # CI/CD
-    "Pipeline",
-    "Stage",
-    "Step",
-    "Builder",
-    "Tester",
-    "Deployer",
-    "CICDController",
-    "DependencyInstaller",
-]

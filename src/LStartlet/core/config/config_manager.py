@@ -5,8 +5,10 @@
 
 import os
 import yaml
-from typing import Any, Dict, Optional, Set, List, Callable, Type
+import json
+from typing import Any, Dict, Optional, Set, List, Callable, Type, Union
 from pathlib import Path
+from dataclasses import is_dataclass
 
 from LStartlet.core.logger import info, error, warning
 from LStartlet.core.path import get_project_root
@@ -26,6 +28,7 @@ class ConfigManager:
         # 监听器
         self._listeners: List[Callable[[str, Any, Any], None]] = []
         self._key_listeners: Dict[str, List[Callable[[str, Any, Any], None]]] = {}
+        self._watchers: List[Any] = []  # 存储活跃的watcher引用
 
         # 配置文件路径
         self._user_config_path = os.path.join(self._project_root, "config.yaml")
@@ -158,14 +161,37 @@ class ConfigManager:
             error(f"无法修改受保护的配置项: {key}")
             return False
 
-        # 验证特定配置项的值
+        # 获取已注册配置的验证信息
+        # 注意：这里简化处理，实际项目中应该存储验证信息
+        # 对于特定配置项进行特殊验证
         if key == "log_level":
             valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-            if value not in valid_levels:
+            if isinstance(value, str) and value.upper() not in valid_levels:
                 error(f"无效的日志级别: {value}")
                 return False
 
         old_value = self._config.get(key)
+        
+        # 基本类型验证（如果配置项已注册）
+        if key in self._config:
+            expected_type = type(self._config[key])
+            if not isinstance(value, expected_type):
+                # 允许字符串到基本类型的转换
+                if expected_type in (int, float, bool) and isinstance(value, str):
+                    try:
+                        if expected_type == int:
+                            value = int(value)
+                        elif expected_type == float:
+                            value = float(value)
+                        elif expected_type == bool:
+                            value = value.lower() in ('true', '1', 'yes')
+                    except (ValueError, TypeError):
+                        error(f"配置项 {key} 的值 '{value}' 无法转换为类型 {expected_type}")
+                        return False
+                else:
+                    error(f"配置项 {key} 的类型不匹配: 期望 {expected_type}, 实际 {type(value)}")
+                    return False
+
         self._config[key] = value
         self._config_sources[key] = "external"
         self._notify_listeners(key, old_value, value)
@@ -201,6 +227,86 @@ class ConfigManager:
 
     # ==================== 配置注册与管理 ====================
 
+    def _validate_config_value(self, key: str, value: Any, expected_type: Type, 
+                             validator: Optional[Callable[[Any], bool]] = None,
+                             schema: Optional[Dict] = None) -> bool:
+        """
+        验证配置值的类型和有效性
+        
+        Args:
+            key: 配置键
+            value: 配置值
+            expected_type: 期望的类型
+            validator: 自定义验证函数
+            schema: JSON Schema 验证规则
+            
+        Returns:
+            验证是否通过
+        """
+        # 基本类型验证
+        if not isinstance(value, expected_type):
+            # 特殊处理：允许字符串转为基本类型
+            if expected_type in (int, float, bool) and isinstance(value, str):
+                try:
+                    if expected_type == int:
+                        int(value)
+                    elif expected_type == float:
+                        float(value)
+                    elif expected_type == bool:
+                        if value.lower() not in ('true', 'false', '1', '0', 'yes', 'no'):
+                            raise ValueError("Invalid boolean string")
+                    return True
+                except (ValueError, TypeError):
+                    error(f"配置项 {key} 的值 '{value}' 无法转换为类型 {expected_type}")
+                    return False
+            else:
+                error(f"配置项 {key} 的类型不匹配: 期望 {expected_type}, 实际 {type(value)}")
+                return False
+        
+        # 自定义验证函数
+        if validator is not None:
+            try:
+                if not validator(value):
+                    error(f"配置项 {key} 的自定义验证失败")
+                    return False
+            except Exception as e:
+                error(f"配置项 {key} 的自定义验证函数执行出错: {e}")
+                return False
+        
+        # JSON Schema 验证
+        if schema is not None:
+            try:
+                self._validate_with_json_schema(key, value, schema)
+            except Exception as e:
+                error(f"配置项 {key} 的 JSON Schema 验证失败: {e}")
+                return False
+        
+        return True
+
+    def _validate_with_json_schema(self, key: str, value: Any, schema: Dict) -> None:
+        """
+        使用 JSON Schema 验证配置值
+        """
+        # 尝试导入 jsonschema 库（可选依赖）
+        try:
+            import jsonschema # type: ignore
+            jsonschema.validate(instance=value, schema=schema)
+        except ImportError:
+            # 如果没有安装 jsonschema，进行基本验证
+            warning("未安装 jsonschema 库，跳过 JSON Schema 验证")
+            # 进行基本的字典结构验证
+            if isinstance(schema, dict) and isinstance(value, dict):
+                required_props = schema.get('required', [])
+                for prop in required_props:
+                    if prop not in value:
+                        raise ValueError(f"缺少必需属性: {prop}")
+        except Exception as e:
+            # 捕获所有验证异常，包括可能的 ValidationError
+            if "jsonschema" in str(type(e)):
+                raise ValueError(f"Schema 验证失败: {str(e)}")
+            else:
+                raise e
+
     def register_config(
         self,
         key: str,
@@ -208,17 +314,26 @@ class ConfigManager:
         value_type: Type,
         description: str = "",
         plugin_name: Optional[str] = None,
+        validator: Optional[Callable[[Any], bool]] = None,
+        schema: Optional[Dict] = None,
     ) -> bool:
-        """注册新的配置项"""
+        """注册新的配置项
+        
+        Args:
+            key: 配置键
+            default_value: 默认值
+            value_type: 值的类型
+            description: 描述
+            plugin_name: 插件名称（用于命名空间）
+            validator: 自定义验证函数
+            schema: JSON Schema 验证规则
+        """
         if self.has_config(key):
             warning(f"配置项 {key} 已存在，跳过注册")
             return False
 
-        # 类型验证
-        if not isinstance(default_value, value_type):
-            error(
-                f"配置项 {key} 的默认值类型不匹配: 期望 {value_type}, 实际 {type(default_value)}"
-            )
+        # 验证默认值
+        if not self._validate_config_value(key, default_value, value_type, validator, schema):
             return False
 
         self._config[key] = default_value
@@ -253,30 +368,40 @@ class ConfigManager:
         self._config_sources[key] = actual_source
         return True
 
-    def add_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]):
-        """为特定配置键添加监听器"""
+    def add_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]) -> None:
+        """添加特定键的配置监听器"""
         if key not in self._key_listeners:
             self._key_listeners[key] = []
-        self._key_listeners[key].append(listener)
+        if listener not in self._key_listeners[key]:
+            self._key_listeners[key].append(listener)
 
-    def add_global_listener(self, listener: Callable[[str, Any, Any], None]):
+    def add_global_listener(self, listener: Callable[[str, Any, Any], None]) -> None:
         """添加全局配置监听器"""
-        self._listeners.append(listener)
+        if listener not in self._listeners:
+            self._listeners.append(listener)
 
-    def remove_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]):
-        """移除特定配置键的监听器"""
-        if key in self._key_listeners:
-            if listener in self._key_listeners[key]:
-                self._key_listeners[key].remove(listener)
-                if not self._key_listeners[key]:
-                    del self._key_listeners[key]
-                return True
+    def remove_key_listener(self, key: str, listener: Callable[[str, Any, Any], None]) -> bool:
+        """移除特定键的配置监听器"""
+        if key in self._key_listeners and listener in self._key_listeners[key]:
+            self._key_listeners[key].remove(listener)
+            if not self._key_listeners[key]:  # 清理空列表
+                del self._key_listeners[key]
+            return True
         return False
 
-    def remove_global_listener(self, listener: Callable[[str, Any, Any], None]):
+    def remove_global_listener(self, listener: Callable[[str, Any, Any], None]) -> bool:
         """移除全局配置监听器"""
         if listener in self._listeners:
             self._listeners.remove(listener)
+            return True
+        return False
+
+    def remove_watcher(self, watcher: Any) -> None:
+        """移除watcher（由ConfigWatcher调用）"""
+        if watcher in self._watchers:
+            self._watchers.remove(watcher)
+        # 注意：实际的监听器移除需要在ConfigWatcher.stop()中处理
+        # 这里主要是清理引用
 
     def list_namespaces(self) -> Set[str]:
         """获取所有已注册的命名空间"""

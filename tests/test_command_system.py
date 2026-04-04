@@ -18,7 +18,7 @@ from LStartlet.core.command.commands.system_commands import (
     ClearCacheCommand,
 )
 from LStartlet.core.command.command_executor import CommandExecutor
-from LStartlet.core.command.command_registry import CommandRegistry
+from LStartlet.core.command.command_registry import CommandRegistry, command_registry
 
 
 class TestCommandSystem(unittest.TestCase):
@@ -88,6 +88,9 @@ class TestCommandSystem(unittest.TestCase):
 
     def test_command_registry(self):
         """测试命令注册表功能"""
+        # 重置命令注册表
+        command_registry._commands.clear()
+        
         echo_cmd = EchoCommand()
         system_cmd = SystemInfoCommand()
 

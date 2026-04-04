@@ -1,6 +1,9 @@
 """
-UI相关事件类型定义
+UI相关事件类型定义（内部使用）
 用于事件系统接管UI组件的样式与实际逻辑连接
+
+注意：这些事件类仅供LStartlet框架内部使用，不作为公共API暴露。
+用户应继承BaseEvent创建自己的事件类型，而不是直接使用这些具体实现。
 """
 
 from ..base_event import BaseEvent

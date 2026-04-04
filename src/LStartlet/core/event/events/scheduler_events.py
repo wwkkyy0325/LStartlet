@@ -1,6 +1,9 @@
 """
-调度系统事件定义
+调度系统事件定义（内部使用）
 定义调度器相关的各种事件类型
+
+注意：这些事件类仅供LStartlet框架内部使用，不作为公共API暴露。
+用户应继承BaseEvent创建自己的事件类型，而不是直接使用这些具体实现。
 """
 
 from typing import Dict, Any, Optional, Type, Callable

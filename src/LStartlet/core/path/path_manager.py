@@ -13,69 +13,40 @@ class PathManager:
         self._initialize_paths()
 
     def _determine_project_root(self) -> str:
-        """确定项目根目录"""
-        # 尝试从环境变量获取
+        """确定项目根目录
+        
+        使用明确的优先级策略：
+        1. 环境变量 INFRA_PROJECT_ROOT
+        2. 包含项目标识文件的目录（setup.py, pyproject.toml, .git, README.md, requirements.txt）
+        3. 当前工作目录（最后回退方案）
+        """
+        # 1. 尝试从环境变量获取
         env_root = os.getenv("INFRA_PROJECT_ROOT")
         if env_root and os.path.exists(env_root):
             return PathUtils.normalize_path(env_root)
 
-        # 从当前文件向上查找
+        # 2. 从当前文件向上查找包含项目标识文件的目录
         current_file = Path(__file__).resolve()
         current_dir = current_file.parent
-
-        # 向上查找直到找到项目根目录标识
+        
+        # 项目根目录标识文件列表
+        project_indicators = [
+            "setup.py",
+            "pyproject.toml", 
+            ".git",
+            "README.md",
+            "requirements.txt"
+        ]
+        
+        # 向上查找直到找到包含项目标识文件的目录
         for parent in [current_dir] + list(current_dir.parents):
-            # 检查是否包含core目录（我们的框架核心）
-            core_path = parent / "core"
-            if core_path.exists() and core_path.is_dir():
-                # 进一步检查是否是真正的项目根目录
-                # 真正的项目根目录应该包含项目标识文件
-                project_indicators = [
-                    "setup.py",
-                    "pyproject.toml",
-                    ".git",
-                    "README.md",
-                    "requirements.txt",
-                ]
-
-                # 检查当前parent目录是否包含这些标识文件
-                has_project_indicator = any(
-                    (parent / indicator).exists() for indicator in project_indicators
-                )
-
-                if has_project_indicator:
-                    # 这很可能是真正的项目根目录
-                    return PathUtils.normalize_path(str(parent))
-
-                # 如果没有项目标识文件，但有core目录，检查parent的父目录
-                # 这处理src布局的情况：src/LStartlet/core -> src/LStartlet 可能不是根目录
-                # 继续向上查找真正的根目录
-                continue
-
-            # 如果当前目录没有core，但有项目标识文件，也可能是根目录
-            # （比如在测试环境中直接运行）
-            project_indicators = [
-                "setup.py",
-                "pyproject.toml",
-                ".git",
-                "README.md",
-                "requirements.txt",
-            ]
             has_project_indicator = any(
                 (parent / indicator).exists() for indicator in project_indicators
             )
             if has_project_indicator:
                 return PathUtils.normalize_path(str(parent))
-
-        # 如果找不到合适的根目录，回退到包含core的最高层级目录
-        for parent in [current_dir] + list(current_dir.parents):
-            core_path = parent / "core"
-            if core_path.exists() and core_path.is_dir():
-                logger_path = core_path / "logger"
-                if logger_path.exists() and logger_path.is_dir():
-                    return PathUtils.normalize_path(str(parent))
-
-        # 最后的回退方案：使用当前工作目录
+        
+        # 3. 最后的回退方案：使用当前工作目录
         return PathUtils.normalize_path(os.getcwd())
 
     def set_project_root(self, root_path: str) -> None:

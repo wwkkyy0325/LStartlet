@@ -4,6 +4,7 @@ CI/CD 控制器 - 管理整个持续集成和持续部署流程
 
 import os
 import json
+import time
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime
 
@@ -300,11 +301,132 @@ class CICDController:
         if not notify_enabled:
             return
 
-        # 这里可以扩展为发送邮件、Slack消息或其他通知方式
+        # 记录通知发送尝试
         info(f"发送通知: {message}, 状态: {status}")
 
-        # TODO: 实现具体的通知发送逻辑（如邮件、Webhook等）
-        pass
+        # 获取通知配置
+        email_enabled = get_config("cicd.notify.email.enabled", False)
+        webhook_enabled = get_config("cicd.notify.webhook.enabled", False)
+        
+        if not email_enabled and not webhook_enabled:
+            warning("通知已启用但未配置任何通知方式（邮件/Webhook）")
+            return
+
+        # 发送邮件通知
+        if email_enabled:
+            self._send_email_notification(message, status)
+        
+        # 发送Webhook通知
+        if webhook_enabled:
+            self._send_webhook_notification(message, status)
+
+    def _send_email_notification(self, message: str, status: str) -> bool:
+        """
+        发送邮件通知
+        
+        Returns:
+            是否成功发送
+        """
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            from email.header import Header
+            
+            # 获取邮件配置
+            smtp_host = get_config("cicd.notify.email.smtp_host", "")
+            smtp_port = get_config("cicd.notify.email.smtp_port", 587)
+            smtp_user = get_config("cicd.notify.email.smtp_user", "")
+            smtp_password = get_config("cicd.notify.email.smtp_password", "")
+            from_email = get_config("cicd.notify.email.from_email", "")
+            to_emails = get_config("cicd.notify.email.to_emails", [])
+            
+            if not all([smtp_host, smtp_user, smtp_password, from_email]) or not to_emails:
+                warning("邮件通知配置不完整，跳过邮件发送")
+                return False
+                
+            # 创建邮件
+            msg = MIMEMultipart()
+            msg['From'] = from_email
+            msg['To'] = ", ".join(to_emails) if isinstance(to_emails, list) else to_emails
+            subject = f"CI/CD Pipeline {'Success' if status == 'success' else 'Failure'}"
+            # 直接使用字符串，避免Header类型问题
+            msg['Subject'] = subject
+            
+            # 邮件正文
+            body = f"""
+CI/CD Pipeline Notification
+
+Status: {status.upper()}
+Message: {message}
+Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}
+            """.strip()
+            
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            
+            # 发送邮件
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            text = msg.as_string()
+            server.sendmail(from_email, to_emails if isinstance(to_emails, list) else [to_emails], text)
+            server.quit()
+            
+            info("邮件通知发送成功")
+            return True
+            
+        except Exception as e:
+            error(f"发送邮件通知失败: {e}")
+            return False
+
+    def _send_webhook_notification(self, message: str, status: str) -> bool:
+        """
+        发送Webhook通知
+        
+        Returns:
+            是否成功发送
+        """
+        try:
+            import urllib.request
+            import json
+            
+            # 获取Webhook配置
+            webhook_url = get_config("cicd.notify.webhook.url", "")
+            webhook_headers = get_config("cicd.notify.webhook.headers", {})
+            webhook_method = get_config("cicd.notify.webhook.method", "POST")
+            
+            if not webhook_url:
+                warning("Webhook通知URL未配置，跳过Webhook发送")
+                return False
+                
+            # 构建通知数据
+            notification_data = {
+                "status": status,
+                "message": message,
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "pipeline_type": "LStartlet CI/CD"
+            }
+            
+            # 发送Webhook请求
+            data = json.dumps(notification_data).encode('utf-8')
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={**webhook_headers, 'Content-Type': 'application/json'},
+                method=webhook_method
+            )
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    info("Webhook通知发送成功")
+                    return True
+                else:
+                    warning(f"Webhook通知返回状态码: {response.status}")
+                    return False
+                    
+        except Exception as e:
+            error(f"发送Webhook通知失败: {e}")
+            return False
 
     def generate_pipeline_report(
         self, pipeline: Pipeline, results: Dict[str, Any]

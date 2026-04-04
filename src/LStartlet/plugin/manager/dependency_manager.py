@@ -165,7 +165,6 @@ class PluginDependencyManager:
                 "--target",
                 str(plugin_dep_dir),
                 "--no-user",
-                "--no-deps",  # 不安装依赖和用户目录
                 package_spec,
             ]
 

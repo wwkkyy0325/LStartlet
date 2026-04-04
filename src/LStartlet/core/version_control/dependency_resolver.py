@@ -107,50 +107,77 @@ class DependencyResolver:
         external_deps: Set[str] = set()
         project_deps: Set[str] = set()
 
-        for root, dirs, files in os.walk(directory):
-            # 跳过某些目录
-            dirs[:] = [
-                d
-                for d in dirs
-                if not d.startswith(".")
-                and d not in {"__pycache__", "venv", "env", "node_modules"}
-            ]
+        try:
+            for root, dirs, files in os.walk(directory):
+                # 跳过某些目录
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if not d.startswith(".")
+                    and d not in {"__pycache__", "venv", "env", "node_modules"}
+                ]
 
-            for file in files:
-                if file.endswith(".py"):
-                    file_path = os.path.join(root, file)
-                    try:
-                        file_deps = self._extract_imports(file_path)
+                for file in files:
+                    if file.endswith(".py"):
+                        file_path = os.path.join(root, file)
+                        try:
+                            file_deps = self._extract_imports(file_path)
 
-                        for dep in file_deps:
-                            # 移除包名中的子模块部分（如将 sklearn.preprocessing 改为 sklearn）
-                            main_package = dep.split(".")[0]
+                            for dep in file_deps:
+                                # 移除包名中的子模块部分（如将 sklearn.preprocessing 改为 sklearn）
+                                main_package = dep.split(".")[0]
 
-                            if main_package in self.stdlib_modules:
-                                continue  # 标准库模块
-                            else:
-                                # 检查是否是项目内部模块
-                                project_module_path = os.path.join(
-                                    self.project_root, *dep.split(".")
-                                )
-                                init_path = os.path.join(
-                                    project_module_path, "__init__.py"
-                                )
-
-                                if os.path.exists(
-                                    project_module_path
-                                ) or os.path.exists(init_path):
-                                    project_deps.add(dep)
+                                if main_package in self.stdlib_modules:
+                                    continue  # 标准库模块
                                 else:
-                                    external_deps.add(main_package)
-                    except Exception as e:
-                        warning(f"分析文件 {file_path} 时出错: {e}")
+                                    # 检查是否是项目内部模块
+                                    is_project_dep = self._is_project_module(dep)
+                                    
+                                    if is_project_dep:
+                                        project_deps.add(dep)
+                                    else:
+                                        external_deps.add(main_package)
+                        except Exception as e:
+                            warning(f"分析文件 {file_path} 时出错: {e}")
+        except Exception as e:
+            warning(f"分析目录 {directory} 时出错: {e}")
+            return {"external": external_deps, "project": project_deps}
 
         info(
             f"分析完成 - 外部依赖: {len(external_deps)}, 项目依赖: {len(project_deps)}"
         )
 
         return {"external": external_deps, "project": project_deps}
+
+    def _is_project_module(self, module_name: str) -> bool:
+        """
+        判断模块是否为项目内部模块
+        
+        Args:
+            module_name: 模块名称（可能是带子模块的完整路径）
+            
+        Returns:
+            是否为项目内部模块
+        """
+        # 将模块名转换为路径
+        module_parts = module_name.split(".")
+        
+        # 尝试多种可能的路径组合
+        for i in range(len(module_parts), 0, -1):
+            test_path = os.path.join(self.project_root, *module_parts[:i])
+            
+            # 检查是否为目录且包含 __init__.py
+            if os.path.isdir(test_path):
+                init_path = os.path.join(test_path, "__init__.py")
+                if os.path.exists(init_path):
+                    return True
+            
+            # 检查是否为 .py 文件
+            py_file_path = test_path + ".py"
+            if os.path.isfile(py_file_path):
+                return True
+        
+        return False
 
     def _extract_imports(self, file_path: str) -> Set[str]:
         """从Python文件中提取导入的模块"""
