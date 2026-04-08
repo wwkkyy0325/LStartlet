@@ -8,7 +8,6 @@ from typing import Optional
 from pathlib import Path
 from ._log_formatter import LogFormatter
 
-
 # 全局配置参数
 _logger: Optional[logging.Logger] = None
 _logger_name: str = "LStartlet"

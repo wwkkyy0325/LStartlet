@@ -121,8 +121,7 @@ class TestPluginAutomation:
             # 创建临时插件文件
             plugin_file = os.path.join(temp_dir, "test_plugin.py")
             with open(plugin_file, "w", encoding="utf-8") as f:
-                f.write(
-                    """
+                f.write("""
 from LStartlet import PluginBase, Plugin
 
 @Plugin
@@ -141,8 +140,7 @@ class DiscoveredPlugin(PluginBase):
     
     def cleanup(self) -> None:
         pass
-"""
-                )
+""")
 
             # 启用自动发现
             auto_manager.enable_auto_discovery([temp_dir])

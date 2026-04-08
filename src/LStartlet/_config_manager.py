@@ -11,7 +11,6 @@ from pathlib import Path
 from . import _path_manager
 from ._logging_functions import info, warning, error
 
-
 # 全局配置存储
 _config_store: Dict[str, Any] = {}
 

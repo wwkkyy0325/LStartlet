@@ -9,7 +9,7 @@ LStartlet is a lightweight application startup and management framework that pro
 - **Modular & Decoupled**: Dependency injection (DI) and plugin system to solve high coupling issues in large Python applications
 - **Automated Operations Support**: Built-in CI/CD controllers, builders, testers, and deployers to simplify build and deployment processes
 - **Unified Configuration & Logging**: Standardized configuration management and logging formatting to reduce development and maintenance costs
-- **Cross-platform Compatibility**: System detection and local environment check scripts for different operating systems
+- **Windows Platform Support**: Optimized for Windows 10/11 environments with system detection and local environment check scripts
 - **Plugin System**: Dynamic plugin loading, dependency management, and metadata management
 - **Event-driven Architecture**: Event bus and event handlers for loose coupling between components
 - **Lifecycle Management**: Standardized component lifecycle phases (PRE_INIT, POST_INIT, ON_DEPENDENCIES_RESOLVED, PRE_START, POST_START, etc.)

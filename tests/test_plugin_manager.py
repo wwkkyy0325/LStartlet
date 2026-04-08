@@ -465,8 +465,7 @@ class TestPluginDiscovery:
             # 创建临时插件文件
             plugin_file = os.path.join(temp_dir, "test_plugin.py")
             with open(plugin_file, "w", encoding="utf-8") as f:
-                f.write(
-                    """
+                f.write("""
 from LStartlet import PluginBase, Plugin
 
 @Plugin
@@ -485,8 +484,7 @@ class DiscoveredPlugin(PluginBase):
     
     def cleanup(self) -> None:
         pass
-"""
-                )
+""")
 
             # 创建插件发现器
             plugin_manager = get_plugin_manager()

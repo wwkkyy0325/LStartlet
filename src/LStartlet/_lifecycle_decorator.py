@@ -3,7 +3,7 @@
 
 支持以下生命周期阶段：
 1. 初始化阶段：@PreInit, @PostInit
-2. 启动阶段：@PreStart, @PostStart  
+2. 启动阶段：@PreStart, @PostStart
 3. 运行阶段：@PreExecute, @PostExecute
 4. 停止阶段：@PreStop, @PostStop
 5. 销毁阶段：@PreDestroy, @PostDestroy

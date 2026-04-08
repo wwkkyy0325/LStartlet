@@ -183,7 +183,7 @@ class DependencyResolver:
         from typing import Dict, List
 
         graph: Dict[str, List[str]] = {}
-        in_degree = {}
+        in_degree: Dict[str, int] = {}
 
         for plugin_name in plugin_names:
             graph[plugin_name] = []
@@ -199,7 +199,7 @@ class DependencyResolver:
 
         # 拓扑排序
         queue = [name for name, degree in in_degree.items() if degree == 0]
-        result = []
+        result: List[str] = []
 
         while queue:
             node = queue.pop(0)
@@ -264,6 +264,16 @@ class PluginLifecycleManager:
 
 class PluginManager:
     """插件管理器"""
+
+    # 实例变量类型注解
+    root_namespace: "PluginNamespace"
+    namespaces: Dict[str, "PluginNamespace"]
+    plugins: Dict[str, PluginInfo]
+    lifecycle_manager: PluginLifecycleManager
+    dependency_resolver: DependencyResolver
+    framework_plugins: Set[str]
+    user_plugins: Set[str]
+    _all_instances: WeakSet[Any]
 
     def __init__(self):
         # 命名空间管理

@@ -12,6 +12,10 @@ class PluginBase(ABC):
     author: ClassVar[str] = ""
     dependencies: ClassVar[list] = []
 
+    # 实例变量类型注解
+    _is_initialized: bool
+    _is_active: bool
+
     def __init__(self):
         self._is_initialized = False
         self._is_active = False

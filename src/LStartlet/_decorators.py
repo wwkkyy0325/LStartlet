@@ -58,7 +58,7 @@ def _get_name(obj: Any, provided_name: Optional[str] = None) -> str:
     if provided_name is not None:
         return provided_name
     if hasattr(obj, "__name__"):
-        return obj.__name__
+        return str(obj.__name__)
     return str(obj)
 
 

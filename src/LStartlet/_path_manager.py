@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import Optional
 
-
 # 全局项目根目录，默认为当前工作目录
 _PROJECT_ROOT: str = os.getcwd()
 

@@ -5,8 +5,7 @@ pytest-env>=0.6.0
 
 # 代码质量
 black>=21.0
-flake8>=3.8
 mypy>=0.900
+types-PyYAML>=6.0.0
 
 # 开发工具
-ipython>=7.0
