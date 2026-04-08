@@ -1,0 +1,100 @@
+# Python
+
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Logs and databases
+*.log
+logs/
+log/
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.test-reports/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+
+# Build artifacts
+*.whl
+*.tar.gz
+
+# Configuration files
+# 用户配置文件 - 不应提交到版本控制
+config.yaml
+config.json
+user_config.yaml
+user_config.json
+system_config.yaml
+system_config.yaml.backup
+*.local.yaml
+*.local.json
+.local/
+
+# 排除任何包含config的yaml/json文件
+*config*.yaml
+*config*.json
+
+# 注意：系统配置文件（如 config.system.yaml, default.config 等）将被追踪
+# 如需忽略特定系统配置文件，请单独添加规则
+
+# 临时文件
+*.tmp
+*.temp
+temp/
+output/
+
+# Data directories
+data/
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Deployment directory - exclude from version control
+/deployment/*
+src/LStartlet/deployment/
+src/LStartlet/deployment/*
+
+# Keep existing specific rules (they are redundant now but harmless)
+.pypirc
+*/__pycache__/*
+*.pyc
+.coveragerc

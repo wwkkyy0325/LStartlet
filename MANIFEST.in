@@ -1,0 +1,18 @@
+include README.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+
+# 包含核心模块的Python文件（适配src布局）
+recursive-include src/LStartlet/core *.py
+
+# 包含插件核心文件（适配src布局）
+recursive-include src/LStartlet/plugin *.py
+recursive-include src/LStartlet/plugin *.json
+
+# 排除特定目录
+prune tests
+prune test_reports  
+prune build
+prune deployment
+prune src/LStartlet/plugin/example_ocr_plugin
