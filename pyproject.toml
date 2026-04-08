@@ -26,6 +26,20 @@ extend-exclude = '''
 )/
 '''
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+# 只收集Test类中的测试方法，忽略模块级别的test_*函数
+disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true
+# 排除非测试类和函数的警告
+filterwarnings = [
+    "ignore::pytest.PytestCollectionWarning",
+    "ignore::pytest.PytestReturnNotNoneWarning",
+]
+
 [tool.coverage.run]
 source = ["src/LStartlet/core", "src/LStartlet/plugin"]
 omit = [

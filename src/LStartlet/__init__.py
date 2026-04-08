@@ -1,94 +1,312 @@
 """
-LStartlet Core Infrastructure Framework
-
-A modular Python infrastructure framework providing high cohesion and low coupling
-for Python applications through unified component management.
-
-This framework offers standardized solutions for:
-- Command System: Command pattern execution with event-driven lifecycle
-- Decorators: Common utilities for error handling, logging, permissions, and metrics
-
-Usage:
-    from LStartlet import BaseCommand, CommandResult, with_error_handling
-    
-    # Define a command
-    @with_error_handling
-    class MyCommand(BaseCommand):
-        def execute(self):
-            return CommandResult.success("Hello")
+LStartlet - 轻量级Python框架
 """
 
-import importlib.metadata
-
-# Get version from package metadata (setuptools_scm)
-try:
-    __version__ = importlib.metadata.version("LStartlet")
-except importlib.metadata.PackageNotFoundError:
-    # Package is not installed, fallback to development version
-    __version__ = "0.1.0.dev0"
-
-# Import core module exports
-from LStartlet.core import (
-    # Decorators
-    with_error_handling,
-    with_logging,
-    plugin_component,
-    plugin_event_handler,
-    with_error_handling_async,
-    with_logging_async,
-    cached_async,
-    require_permission,
-    require_permission_async,
-    PermissionLevel,
-    monitor_metrics,
-    monitor_metrics_async,
-    MetricsCollector,
-    register_service,
-    register_plugin,
-    register_command,
-    
-    # Dependency Injection System
-    ServiceContainer,
-    ServiceLifetime,
-    get_default_container,
-    
-    # Command System - 仅暴露核心抽象接口
-    BaseCommand,
-    CommandResult,
-    CommandMetadata,
-
+# 装饰器模块 - 所有核心装饰器
+from ._decorators import Component, Plugin, ComponentRegistry
+from ._di_decorator import (
+    Inject,
+    InjectProperty,
+    OptionalInject,
+    InjectNamed,
+    InjectAll,
+    InjectMethod,
+    resolve_service,
+    get_di_container,
+    start_framework,
+    stop_framework,  # 添加框架生命周期管理函数
+    resolve_transient,
+    start_transient_instance,
+    stop_transient_instance,  # 瞬态实例相关函数
+    # 实例管理和错误处理相关函数
+    register_error_handler,
+    unregister_error_handler,
+    get_all_instances,
+    get_instances_by_type,
+    get_lifecycle_errors,
+    clear_lifecycle_errors,
+    get_instance_count,
+    get_instance_count_by_type,
+)
+from ._event_decorator import (
+    Event,
+    OnEvent,
+    OnSingleEvent,
+    EventInterceptor,
+    publish_event,
+    publish_event_async,
+    subscribe_event,
+    subscribe_single_event,
+    register_event_interceptor,
+    EventBus,
+    get_event_bus,
+    replace_event_handler,
+)
+from ._cicd_decorator import cicd_step, run_cicd_pipeline
+from ._error_handler import skip_on_error
+from ._lifecycle_decorator import (
+    # 细粒度生命周期装饰器
+    PreInit,
+    PostInit,
+    PreStart,
+    PostStart,
+    PreExecute,
+    PostExecute,
+    PreStop,
+    PostStop,
+    PreDestroy,
+    PostDestroy,
+    OnConfigChange,
+    OnDependenciesResolved,
+    # 简化的四阶段生命周期装饰器
+    Init,
+    Start,
+    Stop,
+    Destroy,
+    trigger_lifecycle_phase,
+    trigger_all_lifecycle_phases,
+    LifecyclePhase,
+    get_lifecycle_manager,
 )
 
-# Re-export version
+# 工具函数模块
+from ._path_manager import (
+    set_project_root,
+    get_project_root,
+    join_paths,
+    ensure_directory_exists,
+    get_core_path,
+    get_logger_path,
+    get_data_path,
+    get_config_path,
+    get_logs_path,
+    get_tick_time,
+    get_tick_ms,
+)
+from ._config_manager import (
+    register_config,
+    get_config,
+    set_config,
+    has_config,
+    get_all_configs,
+    reset_config,
+    reset_all_configs,
+    load_config,
+    save_config,
+    load_project_config,
+    save_project_config,
+    get_system_config,
+    enable_config_auto_save,
+    enable_project_config_auto_save,
+    disable_config_auto_save,
+)
+
+# Plugin System
+from ._plugin_base import PluginBase
+from ._plugin_manager import (
+    PluginManager,
+    PluginState,
+    PluginDependency,
+    PluginInfo,
+    PluginNamespace,
+    DependencyResolver,
+    PluginLifecycleManager,
+    PluginDiscovery,
+    PluginError,
+    DependencyError,
+    get_plugin_manager,
+    register_plugin,
+    load_plugin,
+    activate_plugin,
+    deactivate_plugin,
+    reload_plugin,
+    unload_plugin,
+    get_plugin_info,
+    get_plugins_by_namespace,
+    get_framework_plugins,
+    get_user_plugins,
+    get_all_plugins,
+    analyze_dependencies,
+    get_load_order,
+)
+from ._plugin_automation import (
+    PluginAutoManager,
+    PluginLifecycleIntegration,
+    get_plugin_auto_manager,
+    get_plugin_lifecycle_integration,
+    enable_plugin_automation,
+    disable_plugin_automation,
+    auto_start_plugins,
+    auto_stop_plugins,
+    integrate_plugins_with_framework,
+    disintegrate_plugins_from_framework,
+    register_plugin_auto_start_hook,
+    register_plugin_auto_stop_hook,
+    register_plugin_error_handler,
+    get_plugin_automation_status,
+)
+
+# Global Context Management
+from ._context_manager import (
+    get_global_context,
+    register_context_variable,
+    get_context_value,
+    set_context_value,
+    reset_context_value,
+    reset_all_context,
+)
+
+# 日志模块
+from ._logging_functions import info, debug, warning, error, critical, configure_logger
+from ._log_formatter import LogFormatter
+
 __all__ = [
-    "__version__",
-    
-    # Decorators
-    "with_error_handling",
-    "with_logging",
-    "plugin_component",
-    "plugin_event_handler",
-    "with_error_handling_async",
-    "with_logging_async",
-    "cached_async",
-    "require_permission",
-    "require_permission_async",
-    "PermissionLevel",
-    "monitor_metrics",
-    "monitor_metrics_async",
-    "MetricsCollector",
-    "register_service",
+    # 装饰器
+    "Component",
+    "Plugin",
+    "ComponentRegistry",
+    "Inject",
+    "InjectProperty",
+    "OptionalInject",
+    "InjectNamed",
+    "InjectAll",
+    "InjectMethod",
+    "resolve_service",
+    "get_di_container",
+    "Event",
+    "OnEvent",
+    "OnSingleEvent",
+    "EventInterceptor",
+    "publish_event",
+    "publish_event_async",
+    "subscribe_event",
+    "subscribe_single_event",
+    "register_event_interceptor",
+    "EventBus",
+    "get_event_bus",
+    "replace_event_handler",
+    "cicd_step",
+    "run_cicd_pipeline",
+    "skip_on_error",
+    # 生命周期装饰器
+    "PreInit",
+    "PostInit",
+    "PreStart",
+    "PostStart",
+    "PreExecute",
+    "PostExecute",
+    "PreStop",
+    "PostStop",
+    "PreDestroy",
+    "PostDestroy",
+    "OnConfigChange",
+    "OnDependenciesResolved",
+    # 简化的四阶段生命周期装饰器
+    "Init",
+    "Start",
+    "Stop",
+    "Destroy",
+    "trigger_lifecycle_phase",
+    "trigger_all_lifecycle_phases",
+    "LifecyclePhase",
+    "get_lifecycle_manager",
+    # 框架生命周期管理
+    "start_framework",
+    "stop_framework",
+    # 瞬态实例管理
+    "resolve_transient",
+    "start_transient_instance",
+    "stop_transient_instance",
+    # 实例管理
+    "get_all_instances",
+    "get_instances_by_type",
+    "get_instance_count",
+    "get_instance_count_by_type",
+    # 错误处理
+    "register_error_handler",
+    "unregister_error_handler",
+    "get_lifecycle_errors",
+    "clear_lifecycle_errors",
+    # 工具函数
+    "set_project_root",
+    "get_project_root",
+    "join_paths",
+    "ensure_directory_exists",
+    "get_core_path",
+    "get_logger_path",
+    "get_data_path",
+    "get_config_path",
+    "get_logs_path",
+    "get_tick_time",
+    "get_tick_ms",
+    "register_config",
+    "get_config",
+    "set_config",
+    "has_config",
+    "get_all_configs",
+    "reset_config",
+    "reset_all_configs",
+    "load_config",
+    "save_config",
+    "load_project_config",
+    "save_project_config",
+    "get_system_config",
+    "enable_config_auto_save",
+    "enable_project_config_auto_save",
+    "disable_config_auto_save",
+    # Plugin System
+    "PluginBase",
+    "PluginManager",
+    "PluginState",
+    "PluginDependency",
+    "PluginInfo",
+    "PluginNamespace",
+    "DependencyResolver",
+    "PluginLifecycleManager",
+    "PluginDiscovery",
+    "PluginError",
+    "DependencyError",
+    "get_plugin_manager",
     "register_plugin",
-    "register_command",
-    
-    # Dependency Injection System
-    "ServiceContainer",
-    "ServiceLifetime", 
-    "get_default_container",
-
-    # Command System - 仅暴露核心抽象接口
-    "BaseCommand",
-    "CommandResult",
-    "CommandMetadata",
-
+    "load_plugin",
+    "activate_plugin",
+    "deactivate_plugin",
+    "reload_plugin",
+    "unload_plugin",
+    "get_plugin_info",
+    "get_plugins_by_namespace",
+    "get_framework_plugins",
+    "get_user_plugins",
+    "get_all_plugins",
+    "analyze_dependencies",
+    "get_load_order",
+    "PluginAutoManager",
+    "PluginLifecycleIntegration",
+    "get_plugin_auto_manager",
+    "get_plugin_lifecycle_integration",
+    "enable_plugin_automation",
+    "disable_plugin_automation",
+    "auto_start_plugins",
+    "auto_stop_plugins",
+    "integrate_plugins_with_framework",
+    "disintegrate_plugins_from_framework",
+    "register_plugin_auto_start_hook",
+    "register_plugin_auto_stop_hook",
+    "register_plugin_error_handler",
+    "get_plugin_automation_status",
+    # Global Context Management
+    "get_global_context",
+    "register_context_variable",
+    "get_context_value",
+    "set_context_value",
+    "reset_context_value",
+    "reset_all_context",
+    # 日志
+    "info",
+    "debug",
+    "warning",
+    "error",
+    "critical",
+    "configure_logger",
+    "LogFormatter",
 ]
