@@ -35,7 +35,9 @@ jobs:
     
     - name: Run tests with tox
       run: |
-        tox -e py${{ matrix.python-version }}
+        # Remove dots from python version to match tox env names (e.g., 3.10 -> 310)
+        $PYTHON_VERSION_NO_DOTS = "${{ matrix.python-version }}".Replace(".", "")
+        tox -e py$PYTHON_VERSION_NO_DOTS
 
   code-quality:
     runs-on: windows-latest
