@@ -120,7 +120,7 @@ class TestPluginAutomation:
         with tempfile.TemporaryDirectory() as temp_dir:
             # 创建临时插件文件
             plugin_file = os.path.join(temp_dir, "test_plugin.py")
-            with open(plugin_file, "w") as f:
+            with open(plugin_file, "w", encoding="utf-8") as f:
                 f.write(
                     """
 from LStartlet import PluginBase, Plugin
