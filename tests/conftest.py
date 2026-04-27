@@ -17,75 +17,47 @@ def setup_test_environment():
     """
     自动应用的fixture - 为每个测试设置基础环境
 
-    这个fixture会自动清理ComponentRegistry，确保测试之间的隔离性
+    这个fixture会自动清理DI容器，确保测试之间的隔离性
     """
-    from LStartlet import ComponentRegistry
+    from LStartlet._di_decorator import _get_di_container
 
-    # 测试前清理注册表
-    ComponentRegistry._components.clear()
-    ComponentRegistry._plugins.clear()
+    di_container = _get_di_container()
+    # 测试前清理
+    di_container._services.clear()
+    di_container._components.clear()
+    di_container._all_instances.clear()
 
     yield  # 测试执行点
 
     # 测试后再次清理（双重保险）
-    ComponentRegistry._components.clear()
-    ComponentRegistry._plugins.clear()
+    di_container._services.clear()
+    di_container._components.clear()
+    di_container._all_instances.clear()
 
 
 @pytest.fixture
-def component_registry():
-    """提供ComponentRegistry实例的fixture"""
-    from LStartlet import ComponentRegistry
+def di_container():
+    """提供DI容器实例的fixture"""
+    from LStartlet._di_decorator import _get_di_container
 
-    return ComponentRegistry
+    return _get_di_container()
 
 
 @pytest.fixture
-def fresh_component_registry():
+def fresh_di_container():
     """
-    提供干净的ComponentRegistry实例的fixture
+    提供干净的DI容器实例的fixture
 
-    每次调用都会返回一个清空的注册表
+    每次调用都会返回一个清空的容器
     """
-    from LStartlet import ComponentRegistry
+    from LStartlet._di_decorator import _get_di_container
 
-    # 清空注册表
-    ComponentRegistry._components.clear()
-    ComponentRegistry._plugins.clear()
+    di_container = _get_di_container()
+    di_container._services.clear()
+    di_container._components.clear()
+    di_container._all_instances.clear()
 
-    return ComponentRegistry
-
-
-@pytest.fixture
-def sample_component_class():
-    """提供示例组件类的fixture"""
-    from LStartlet import Component
-
-    @Component
-    class SampleComponent:
-        def __init__(self, value="test"):
-            self.value = value
-
-        def get_value(self):
-            return self.value
-
-    return SampleComponent
-
-
-@pytest.fixture
-def sample_plugin_class():
-    """提供示例插件类的fixture"""
-    from LStartlet import Plugin
-
-    @Plugin
-    class SamplePlugin:
-        def __init__(self, name="sample"):
-            self.name = name
-
-        def get_name(self):
-            return self.name
-
-    return SamplePlugin
+    return di_container
 
 
 @pytest.fixture
@@ -115,7 +87,6 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "decorator: 标记装饰器相关测试")
     config.addinivalue_line("markers", "di: 标记依赖注入相关测试")
     config.addinivalue_line("markers", "logging: 标记日志相关测试")
-    config.addinivalue_line("markers", "plugin: 标记插件相关测试")
 
 
 def pytest_collection_modifyitems(config, items):

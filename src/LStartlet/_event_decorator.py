@@ -1,632 +1,471 @@
 """
 极简事件监听装饰器 - 实现唯一的事件总线
+支持命名空间隔离，类似于配置管理和日志系统
 """
 
 import asyncio
 import inspect
-from typing import Any, Callable, Dict, List, Type, Optional, Tuple
+from typing import Any, Callable, Dict, List, Type, Optional
 from dataclasses import dataclass
 
+from ._logging import (
+    _log_framework_warning,
+    _log_framework_error,
+    _log_framework_debug,
+)
 
-@dataclass
+
+# 从 _application_info 导入统一的 _get_current_app_name 函数
+_get_current_app_name = None
+
+
+def _ensure_get_current_app_name():
+    """确保 _get_current_app_name 函数已导入"""
+    global _get_current_app_name
+    if _get_current_app_name is None:
+        from ._application_info import _get_current_app_name as _get_app_name
+
+        _get_current_app_name = _get_app_name
+
+
 class Event:
-    """基础事件类"""
+    """
+    基础事件类 - 所有自定义事件必须继承此类
+
+    Example:
+        @dataclass
+        class MyEvent(Event):
+            message: str
+
+        @dataclass
+        class UserLoginEvent(Event):
+            username: str
+            login_time: float
+
+    Note:
+        - 事件子类需要使用 @dataclass 装饰器自动生成 __init__ 方法
+        - 事件字段可以是任意类型
+        - 发布事件时使用 publish_event() 函数
+        - 订阅事件时使用 subscribe_event() 函数
+    """
 
     pass
 
 
 @dataclass
-class EventHandler:
-    """事件处理器包装器"""
+class _EventHandler:
+    """事件处理器包装器（内部类）"""
 
     func: Callable
     condition: Optional[Callable] = None
-    topic: Optional[str] = None
 
 
-class EventBus:
-    """简单的事件总线实现"""
+class _EventBusManager:
+    """事件总线管理器（内部类）"""
 
     def __init__(self):
-        # 事件类型到处理器列表的映射（包含条件和主题）
-        self._handlers: Dict[Type[Event], List[EventHandler]] = {}
-        # 单线事件处理器（只有一个）
-        self._single_handlers: Dict[Type[Event], EventHandler] = {}
-        # 异步处理器标记
-        self._async_handlers: Dict[Callable, bool] = {}
-        # 拦截器映射
-        self._interceptors: Dict[Type[Event], Callable] = {}
+        self._buses: Dict[str, "_EventBus"] = {}
+        self._framework_bus: Optional["_EventBus"] = None
 
-    def subscribe(
+    def _get_bus(self) -> "_EventBus":
+        """获取当前应用的事件总线（内部方法）"""
+        _ensure_get_current_app_name()
+
+        namespace = "lstartlet"
+        if _get_current_app_name is not None:
+            app_name = _get_current_app_name()
+            if app_name is not None:
+                namespace = app_name
+
+        if namespace == "lstartlet":
+            if self._framework_bus is None:
+                self._framework_bus = _EventBus()
+            return self._framework_bus
+
+        if namespace not in self._buses:
+            self._buses[namespace] = _EventBus()
+        return self._buses[namespace]
+
+    def _clear_namespace(self, namespace: str):
+        """清除指定命名空间的事件总线（内部方法）"""
+        if namespace in self._buses:
+            del self._buses[namespace]
+
+    def _clear_all(self):
+        """清除所有命名空间的事件总线（内部方法）"""
+        self._buses.clear()
+        self._framework_bus = None
+
+
+class _EventBus:
+    """事件总线实现（内部类）"""
+
+    def __init__(self):
+        self._handlers: Dict[Type[Event], List[_EventHandler]] = {}
+        self._async_handlers: Dict[Callable, bool] = {}
+        self._filters: List[Dict] = []
+
+    def _register_filter(
+        self,
+        filter_func: Callable[[Event], bool],
+        event_type: Optional[Type[Event]] = None,
+        namespace: Optional[str] = None,
+        priority: int = 0,
+    ):
+        """注册事件过滤器（内部方法）"""
+        filter_info = {
+            "func": filter_func,
+            "event_type": event_type,
+            "namespace": namespace,
+            "priority": priority,
+        }
+        self._filters.append(filter_info)
+        self._filters.sort(key=lambda x: -x["priority"])
+
+    def _unregister_filter(self, filter_func: Callable[[Event], bool]):
+        """取消注册事件过滤器（内部方法）"""
+        self._filters = [f for f in self._filters if f["func"] is not filter_func]
+
+    def _should_propagate(self, event: Event) -> bool:
+        """检查事件是否应该传播（内部方法）"""
+        for filter_info in self._filters:
+            filter_func = filter_info["func"]
+            filter_event_type = filter_info["event_type"]
+            filter_namespace = filter_info["namespace"]
+
+            if filter_event_type is not None and not isinstance(
+                event, filter_event_type
+            ):
+                continue
+
+            if filter_namespace is not None:
+                _ensure_get_current_app_name()
+                current_namespace = "lstartlet"
+                if _get_current_app_name is not None:
+                    app_name = _get_current_app_name()
+                    if app_name is not None:
+                        current_namespace = app_name
+                if current_namespace != filter_namespace:
+                    continue
+
+            try:
+                if not filter_func(event):
+                    return False
+            except Exception as e:
+                _log_framework_warning(f"事件过滤器执行失败: {e}")
+                return False
+        return True
+
+    def _subscribe(
         self,
         event_type: Type[Event],
         handler: Callable,
         condition: Optional[Callable] = None,
-        topic: Optional[str] = None,
     ):
-        """订阅事件（多线）"""
-        wrapper = EventHandler(handler, condition, topic)
+        """订阅事件（内部方法）"""
+        is_async = asyncio.iscoroutinefunction(handler)
+        self._async_handlers[handler] = is_async
+
+        wrapper = _EventHandler(handler, condition)
         if event_type not in self._handlers:
             self._handlers[event_type] = []
+
+        for existing_wrapper in self._handlers[event_type]:
+            if (
+                existing_wrapper.func is handler
+                and existing_wrapper.condition == condition
+            ):
+                return
+
         self._handlers[event_type].append(wrapper)
 
-    def subscribe_single(
+    def _unsubscribe(
         self,
         event_type: Type[Event],
         handler: Callable,
-        condition: Optional[Callable] = None,
-        topic: Optional[str] = None,
     ):
-        """订阅事件（单线）"""
-        wrapper = EventHandler(handler, condition, topic)
-        self._single_handlers[event_type] = wrapper
-
-    def register_interceptor(self, event_type: Type[Event], interceptor: Callable):
-        """注册事件拦截器"""
-        self._interceptors[event_type] = interceptor
-
-    def unsubscribe(self, event_type: Type[Event], handler: Callable):
-        """取消订阅事件"""
+        """取消订阅事件（内部方法）"""
         if event_type in self._handlers:
             self._handlers[event_type] = [
                 h for h in self._handlers[event_type] if h.func is not handler
             ]
             if handler in self._async_handlers:
                 del self._async_handlers[handler]
-        elif (
-            event_type in self._single_handlers
-            and self._single_handlers[event_type].func is handler
-        ):
-            del self._single_handlers[event_type]
-            if handler in self._async_handlers:
-                del self._async_handlers[handler]
 
-    def _should_handle(self, handler: EventHandler, event: Event) -> bool:
-        """检查处理器是否应该处理该事件"""
-        # 检查条件过滤器
+    def _should_handle(self, handler: _EventHandler, event: Event) -> bool:
+        """检查处理器是否应该处理该事件（内部方法）"""
         if handler.condition is not None:
             try:
                 if not handler.condition(event):
                     return False
             except Exception as e:
-                print(f"事件条件过滤器执行失败: {e}")
-                return False
-
-        # 检查主题匹配
-        if handler.topic is not None:
-            event_topic = getattr(event, "topic", None)
-            if event_topic != handler.topic:
+                _log_framework_warning(f"事件条件过滤器执行失败: {e}")
                 return False
 
         return True
 
-    def publish(self, event: Event):
-        """发布事件（同步）"""
+    def _publish(self, event: Event):
+        """发布事件（内部方法）"""
         event_type = type(event)
 
-        # 检查是否有拦截器
-        should_propagate_to_multi = True
-        if event_type in self._interceptors:
-            interceptor = self._interceptors[event_type]
-            try:
-                should_continue = interceptor(event)
-                if should_continue is False:
-                    # 拦截器返回False，阻止多线事件传播
-                    should_propagate_to_multi = False
-            except Exception as e:
-                print(f"事件拦截器执行失败: {e}")
-                should_propagate_to_multi = False
+        if not self._should_propagate(event):
+            _log_framework_debug(f"事件被过滤器阻止: {event_type.__name__}")
+            return
 
-        # 优先处理单线事件（不受拦截器影响）
-        if event_type in self._single_handlers:
-            handler_wrapper = self._single_handlers[event_type]
-            if self._should_handle(handler_wrapper, event):
-                handler = handler_wrapper.func
-                if self._async_handlers.get(handler, False):
-                    # 异步处理器：检查是否有运行的事件循环
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(handler(event))
-                    except RuntimeError:
-                        # 没有运行的事件循环，记录警告
-                        print(
-                            f"警告: 异步事件处理器 {handler.__name__} 在同步上下文中被调用，但没有运行的事件循环"
-                        )
-                else:
-                    try:
-                        handler(event)
-                    except Exception as e:
-                        import traceback
-
-                        print(f"事件处理器执行失败: {e}")
-                        print(f"处理器: {handler.__name__}")
-                        traceback.print_exc()
-
-        # 处理多线事件（受拦截器控制）
-        if should_propagate_to_multi and event_type in self._handlers:
+        if event_type in self._handlers:
             for handler_wrapper in self._handlers[event_type]:
                 if self._should_handle(handler_wrapper, event):
                     handler = handler_wrapper.func
                     if self._async_handlers.get(handler, False):
-                        # 异步处理器：检查是否有运行的事件循环
                         try:
                             loop = asyncio.get_running_loop()
                             loop.create_task(handler(event))
                         except RuntimeError:
-                            # 没有运行的事件循环，记录警告
-                            print(
-                                f"警告: 异步事件处理器 {handler.__name__} 在同步上下文中被调用，但没有运行的事件循环"
+                            _log_framework_warning(
+                                f"异步事件处理器 {handler.__name__} 在同步上下文中被调用，但没有运行的事件循环"
                             )
                     else:
                         try:
                             handler(event)
                         except Exception as e:
-                            print(f"事件处理器执行失败: {e}")
+                            import traceback
 
-    async def publish_async(self, event: Event):
-        """异步发布事件"""
+                            _log_framework_error(f"事件处理器执行失败: {e}")
+                            _log_framework_error(f"处理器: {handler.__name__}")
+                            _log_framework_error(traceback.format_exc())
+
+    async def _publish_async(self, event: Event):
+        """异步发布事件（内部方法）"""
         event_type = type(event)
 
-        # 检查是否有拦截器
-        should_propagate_to_multi = True
-        if event_type in self._interceptors:
-            interceptor = self._interceptors[event_type]
-            try:
-                should_continue = interceptor(event)
-                if should_continue is False:
-                    # 拦截器返回False，阻止多线事件传播
-                    should_propagate_to_multi = False
-            except Exception as e:
-                print(f"事件拦截器执行失败: {e}")
-                should_propagate_to_multi = False
+        if not self._should_propagate(event):
+            _log_framework_debug(f"事件被过滤器阻止: {event_type.__name__}")
+            return
 
-        # 优先处理单线事件（不受拦截器影响）
-        tasks = []
-        if event_type in self._single_handlers:
-            handler_wrapper = self._single_handlers[event_type]
-            if self._should_handle(handler_wrapper, event):
-                handler = handler_wrapper.func
-                if self._async_handlers.get(handler, False):
-                    tasks.append(handler(event))
-                else:
-                    try:
-                        handler(event)
-                    except Exception as e:
-                        print(f"事件处理器执行失败: {e}")
-
-        # 处理多线事件（受拦截器控制）
-        if should_propagate_to_multi and event_type in self._handlers:
+        if event_type in self._handlers:
             for handler_wrapper in self._handlers[event_type]:
                 if self._should_handle(handler_wrapper, event):
                     handler = handler_wrapper.func
                     if self._async_handlers.get(handler, False):
-                        tasks.append(handler(event))
+                        try:
+                            await handler(event)
+                        except Exception as e:
+                            import traceback
+
+                            _log_framework_error(f"异步事件处理器执行失败: {e}")
+                            _log_framework_error(f"处理器: {handler.__name__}")
+                            _log_framework_error(traceback.format_exc())
                     else:
                         try:
                             handler(event)
                         except Exception as e:
-                            print(f"事件处理器执行失败: {e}")
+                            import traceback
 
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+                            _log_framework_error(f"事件处理器执行失败: {e}")
+                            _log_framework_error(f"处理器: {handler.__name__}")
+                            _log_framework_error(traceback.format_exc())
 
 
-# 全局事件总线实例
-_event_bus = EventBus()
+# 全局事件总线管理器
+_event_bus_manager = _EventBusManager()
+
+
+# 公共API函数
+def get_event_bus() -> "_EventBus":
+    """
+    获取当前应用的事件总线（公共API）
+
+    命名空间自动从元数据定义的应用名获取。
+
+    Returns:
+        当前应用的事件总线
+    """
+    return _event_bus_manager._get_bus()
+
+
+def publish_event(event: Event, async_mode: bool = False):
+    """
+    发布事件 - 向事件总线发布事件
+
+    Args:
+        event: 要发布的事件对象（必须继承自 Event）
+        async_mode: 是否异步发布（默认为 False，同步发布）
+
+    Returns:
+        异步模式下返回协程对象，同步模式下返回 None
+
+    Example:
+        class MyEvent(Event):
+            message: str
+
+        publish_event(MyEvent(message="Hello"))
+
+        await publish_event(MyEvent(message="Hello"), async_mode=True)
+
+    Note:
+        - 同步模式：所有订阅者按顺序执行，阻塞直到完成
+        - 异步模式：所有订阅者并发执行，返回协程对象
+        - 事件发布失败不会影响其他订阅者
+        - 支持条件订阅，只有满足条件的订阅者才会收到事件
+    """
+    event_bus = _event_bus_manager._get_bus()
+
+    if async_mode:
+        return event_bus._publish_async(event)
+    else:
+        event_bus._publish(event)
 
 
 def subscribe_event(
     event_type: Type[Event],
     handler: Callable,
     condition: Optional[Callable] = None,
-    topic: Optional[str] = None,
 ):
     """
-    手动订阅事件（多线）
-
-    为指定事件类型注册一个事件处理器，可以有多个处理器同时监听同一事件。
-    当事件发布时，所有匹配的处理器都会被调用。
+    订阅事件 - 为指定事件类型注册处理器
 
     Args:
-        event_type: 事件类型（继承自Event的类）
+        event_type: 事件类型（必须继承自 Event）
         handler: 事件处理函数，接收事件对象作为参数
-        condition: 可选的条件过滤器函数，接收事件对象，返回True时才处理
-        topic: 可选的事件主题/通道，用于事件路由
+        condition: 可选的条件过滤器函数，返回 True 时才处理事件
 
     Returns:
         None
 
     Example:
-        from LStartlet import subscribe_event, publish_event, Event
+        class MyEvent(Event):
+            message: str
 
-        class ButtonClickEvent(Event):
-            button_id: str
+        def handler(event: MyEvent):
+            print(f"收到事件: {event.message}")
 
-        # 订阅事件
-        def handle_click(event: ButtonClickEvent):
-            print(f"按钮被点击: {event.button_id}")
+        subscribe_event(MyEvent, handler)
 
-        subscribe_event(ButtonClickEvent, handle_click)
+        # 带条件过滤
+        def condition_handler(event: MyEvent):
+            return len(event.message) > 5
 
-        # 发布事件
-        event = ButtonClickEvent(button_id="save_btn")
-        publish_event(event)
+        subscribe_event(MyEvent, condition_handler, condition=lambda e: e.message.startswith("important"))
+
+    Note:
+        - 同一个事件类型可以有多个订阅者
+        - 订阅者按注册顺序执行
+        - 异步订阅者会自动并发执行
+        - 条件函数接收事件对象作为参数
+        - 使用 unsubscribe_event() 取消订阅
     """
-    _event_bus.subscribe(event_type, handler, condition, topic)
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._subscribe(event_type, handler, condition)
 
 
-def subscribe_single_event(
+def unsubscribe_event(
+    event_type: Type[Event],
+    handler: Callable,
+):
+    """
+    取消订阅事件（公共API）
+
+    Args:
+        event_type: 事件类型
+        handler: 要移除的事件处理函数
+
+    Example:
+        unsubscribe_event(MyEvent, handler)
+    """
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._unsubscribe(event_type, handler)
+
+
+def register_event_filter(
+    filter_func: Callable[[Event], bool],
+    event_type: Optional[Type[Event]] = None,
+    namespace: Optional[str] = None,
+    priority: int = 0,
+):
+    """
+    注册事件过滤器（公共API）
+
+    注册一个全局事件过滤器，所有事件都会经过这个过滤器。
+
+    Args:
+        filter_func: 过滤器函数，接收事件对象，返回True表示允许传播
+        event_type: 可选的事件类型
+        namespace: 可选的命名空间
+        priority: 过滤器优先级，数值越小优先级越高
+
+    Example:
+        def my_filter(event: Event) -> bool:
+            return True  # 允许所有事件
+
+        register_event_filter(my_filter)
+    """
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._register_filter(filter_func, event_type, namespace, priority)
+
+
+def unregister_event_filter(filter_func: Callable[[Event], bool]):
+    """
+    取消注册事件过滤器（公共API）
+
+    Args:
+        filter_func: 要移除的过滤器函数
+
+    Example:
+        unregister_event_filter(my_filter)
+    """
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._unregister_filter(filter_func)
+
+
+# 内部函数（框架内部使用）
+def _get_event_bus() -> "_EventBus":
+    """获取当前应用的事件总线实例（内部函数）"""
+    return _event_bus_manager._get_bus()
+
+
+def _subscribe_event(
     event_type: Type[Event],
     handler: Callable,
     condition: Optional[Callable] = None,
-    topic: Optional[str] = None,
 ):
-    """
-    手动订阅事件（单线）
-
-    为指定事件类型注册一个唯一的事件处理器，同一事件类型只能有一个单线处理器。
-    如果注册了新的单线处理器，旧的会被替换。
-    单线处理器不受拦截器影响。
-
-    Args:
-        event_type: 事件类型（继承自Event的类）
-        handler: 事件处理函数，接收事件对象作为参数
-        condition: 可选的条件过滤器函数，接收事件对象，返回True时才处理
-        topic: 可选的事件主题/通道，用于事件路由
-
-    Returns:
-        None
-
-    Example:
-        from LStartlet import subscribe_single_event, publish_event, Event
-
-        class ExitEvent(Event):
-            reason: str
-
-        # 订阅单线事件
-        def handle_exit(event: ExitEvent):
-            print(f"应用程序退出: {event.reason}")
-
-        subscribe_single_event(ExitEvent, handle_exit)
-
-        # 发布事件
-        event = ExitEvent(reason="用户请求")
-        publish_event(event)
-    """
-    _event_bus.subscribe_single(event_type, handler, condition, topic)
+    """手动订阅事件（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._subscribe(event_type, handler, condition)
 
 
-def register_event_interceptor(event_type: Type[Event], interceptor: Callable):
-    """
-    手动注册事件拦截器
-
-    为指定事件类型注册一个拦截器，在事件处理器执行前被调用。
-    拦截器可以阻止事件传播到多线处理器，但不影响单线处理器。
-
-    Args:
-        event_type: 事件类型（继承自Event的类）
-        interceptor: 拦截器函数，接收事件对象作为参数，返回False可阻止传播
-
-    Returns:
-        None
-
-    Example:
-        from LStartlet import register_event_interceptor, publish_event, Event
-
-        class DataChangeEvent(Event):
-            data: str
-
-        # 注册拦截器
-        def intercept_data_change(event: DataChangeEvent):
-            print(f"拦截数据变更: {event.data}")
-            # 返回False阻止事件传播
-            return False
-
-        register_event_interceptor(DataChangeEvent, intercept_data_change)
-
-        # 发布事件（会被拦截）
-        event = DataChangeEvent(data="test")
-        publish_event(event)
-    """
-    _event_bus.register_interceptor(event_type, interceptor)
-
-
-def OnEvent(
+def _unsubscribe_event(
     event_type: Type[Event],
-    condition: Optional[Callable] = None,
-    topic: Optional[str] = None,
+    handler: Callable,
 ):
-    """
-    事件监听装饰器
-
-    Args:
-        event_type: 要监听的事件类型
-        condition: 条件过滤器函数，接收事件对象，返回bool
-        topic: 事件主题/通道，用于事件路由
-
-    Note:
-        支持任何类或顶层函数使用此装饰器，不再强制要求@Component或@Plugin标记
-
-    Example:
-        class ButtonClickEvent(Event):
-            button_id: str
-            topic: str
-
-        # 普通类也可以使用
-        class MyController:
-            @OnEvent(ButtonClickEvent, condition=lambda e: e.button_id == "save_btn")
-            def handle_save_button(self, event: ButtonClickEvent):
-                print(f"保存按钮被点击: {event.button_id}")
-
-        # 顶层函数也可以使用
-        @OnEvent(ButtonClickEvent)
-        def global_handler(event: ButtonClickEvent):
-            print("全局事件处理")
-    """
-
-    def decorator(func: Callable) -> Callable:
-        # 使用统一的元数据属性名 _decorator_metadata
-        if not hasattr(func, "_decorator_metadata"):
-            setattr(func, "_decorator_metadata", [])
-
-        event_metadata = {
-            "type": "event",
-            "event_type": event_type,
-            "condition": condition,
-            "topic": topic,
-            "handler_type": "multi",  # 多线处理器
-        }
-        getattr(func, "_decorator_metadata").append(event_metadata)
-
-        # 保持向后兼容性：同时设置旧的 _event_metadata 属性
-        if not hasattr(func, "_event_metadata"):
-            setattr(func, "_event_metadata", [])
-
-        old_metadata = {
-            "event_type": event_type,
-            "condition": condition,
-            "topic": topic,
-            "handler_type": "multi",
-        }
-        getattr(func, "_event_metadata").append(old_metadata)
-
-        # 直接注册事件处理器（保持向后兼容性）
-        _event_bus.subscribe(event_type, func, condition, topic)
-        return func
-
-    return decorator
+    """手动取消订阅事件（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._unsubscribe(event_type, handler)
 
 
-def OnSingleEvent(
-    event_type: Type[Event],
-    condition: Optional[Callable] = None,
-    topic: Optional[str] = None,
+def _register_event_filter(
+    filter_func: Callable[[Event], bool],
+    event_type: Optional[Type[Event]] = None,
+    namespace: Optional[str] = None,
+    priority: int = 0,
 ):
-    """
-    单线事件监听装饰器（只有一个处理器）
-
-    Args:
-        event_type: 要监听的事件类型
-        condition: 条件过滤器函数，接收事件对象，返回bool
-        topic: 事件主题/通道，用于事件路由
-
-    Note:
-        支持任何类或顶层函数使用此装饰器，不再强制要求@Component或@Plugin标记
-
-    Example:
-        class ExitHandler:
-            @OnSingleEvent(ButtonClickEvent, condition=lambda e: e.button_id == "exit_btn")
-            def handle_exit_button(self, event: ButtonClickEvent):
-                # 只处理退出按钮
-                pass
-    """
-
-    def decorator(func: Callable) -> Callable:
-        # 使用统一的元数据属性名 _decorator_metadata
-        if not hasattr(func, "_decorator_metadata"):
-            setattr(func, "_decorator_metadata", [])
-
-        event_metadata = {
-            "type": "event",
-            "event_type": event_type,
-            "condition": condition,
-            "topic": topic,
-            "handler_type": "single",  # 单线处理器
-        }
-        getattr(func, "_decorator_metadata").append(event_metadata)
-
-        # 保持向后兼容性：同时设置旧的 _event_metadata 属性
-        if not hasattr(func, "_event_metadata"):
-            setattr(func, "_event_metadata", [])
-
-        old_metadata = {
-            "event_type": event_type,
-            "condition": condition,
-            "topic": topic,
-            "handler_type": "single",
-        }
-        getattr(func, "_event_metadata").append(old_metadata)
-
-        # 直接注册事件处理器（保持向后兼容性）
-        _event_bus.subscribe_single(event_type, func, condition, topic)
-        return func
-
-    return decorator
+    """注册事件过滤器（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._register_filter(filter_func, event_type, namespace, priority)
 
 
-def EventInterceptor(event_type: Type[Event]):
-    """
-    事件拦截器装饰器
-
-    Args:
-        event_type: 要拦截的事件类型
-
-    Returns:
-        bool: True继续传播事件，False阻止事件传播
-
-    Example:
-        @EventInterceptor(ButtonClickEvent)
-        def intercept_old_ui(event: ButtonClickEvent):
-            # 阻止老UI处理事件
-            return False
-    """
-
-    def decorator(func: Callable) -> Callable:
-        # 使用统一的元数据属性名 _decorator_metadata
-        if not hasattr(func, "_decorator_metadata"):
-            setattr(func, "_decorator_metadata", [])
-
-        event_metadata = {
-            "type": "event",
-            "event_type": event_type,
-            "handler_type": "interceptor",  # 拦截器
-        }
-        getattr(func, "_decorator_metadata").append(event_metadata)
-
-        # 保持向后兼容性：同时设置旧的 _event_metadata 属性
-        if not hasattr(func, "_event_metadata"):
-            setattr(func, "_event_metadata", [])
-
-        old_metadata = {"event_type": event_type, "handler_type": "interceptor"}
-        getattr(func, "_event_metadata").append(old_metadata)
-
-        # 直接注册事件拦截器（保持向后兼容性）
-        _event_bus.register_interceptor(event_type, func)
-        return func
-
-    return decorator
+def _unregister_event_filter(filter_func: Callable[[Event], bool]):
+    """取消注册事件过滤器（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._unregister_filter(filter_func)
 
 
-def publish_event(event: Event):
-    """
-    发布事件的便捷函数
-
-    同步发布事件，触发所有匹配的事件处理器。
-    如果有拦截器，拦截器会先执行，可以阻止事件传播到多线处理器。
-
-    Args:
-        event: 事件对象（继承自Event的类实例）
-
-    Returns:
-        None
-
-    Example:
-        from LStartlet import publish_event, Event
-
-        class ButtonClickEvent(Event):
-            button_id: str
-
-        # 发布事件
-        event = ButtonClickEvent(button_id="save_btn")
-        publish_event(event)
-    """
-    _event_bus.publish(event)
+def _publish_event(event: Event):
+    """发布事件（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    event_bus._publish(event)
 
 
-def publish_event_async(event: Event):
-    """
-    异步发布事件的便捷函数
-
-    异步发布事件，触发所有匹配的事件处理器。
-    异步处理器会在事件循环中执行，同步处理器会立即执行。
-
-    Args:
-        event: 事件对象（继承自Event的类实例）
-
-    Returns:
-        Coroutine: 异步协程对象
-
-    Example:
-        import asyncio
-        from LStartlet import publish_event_async, Event
-
-        class ButtonClickEvent(Event):
-            button_id: str
-
-        # 异步发布事件
-        async def main():
-            event = ButtonClickEvent(button_id="save_btn")
-            await publish_event_async(event)
-
-        asyncio.run(main())
-    """
-    return _event_bus.publish_async(event)
-
-
-def replace_event_handler(
-    old_handler: Callable, new_handler: Callable, event_type: Type[Event]
-):
-    """
-    替换事件处理器（用于动态替换）
-
-    动态替换已注册的事件处理器，适用于运行时需要改变处理逻辑的场景。
-
-    Args:
-        old_handler: 要替换的旧处理器函数
-        new_handler: 新的处理器函数
-        event_type: 事件类型
-
-    Returns:
-        None
-
-    Example:
-        from LStartlet import replace_event_handler, subscribe_event, publish_event, Event
-
-        class ButtonClickEvent(Event):
-            button_id: str
-
-        # 初始处理器
-        def old_handler(event: ButtonClickEvent):
-            print("旧处理器")
-
-        # 新处理器
-        def new_handler(event: ButtonClickEvent):
-            print("新处理器")
-
-        # 订阅初始处理器
-        subscribe_event(ButtonClickEvent, old_handler)
-
-        # 替换处理器
-        replace_event_handler(old_handler, new_handler, ButtonClickEvent)
-
-        # 发布事件（会使用新处理器）
-        event = ButtonClickEvent(button_id="save_btn")
-        publish_event(event)
-    """
-
-    _event_bus.unsubscribe(event_type, old_handler)
-    _event_bus.subscribe(event_type, new_handler)
-
-
-# 兼容性别名
-def get_event_bus() -> EventBus:
-    """
-    获取全局事件总线实例
-
-    返回框架的全局事件总线，用于管理所有事件处理器和事件发布。
-    通常情况下，用户不需要直接调用此函数，而是使用便捷函数。
-
-    Returns:
-        EventBus: 全局事件总线实例
-
-    Example:
-        from LStartlet import get_event_bus, Event
-
-        # 获取事件总线
-        bus = get_event_bus()
-
-        # 定义事件
-        class MyEvent(Event):
-            data: str
-
-        # 订阅事件
-        def handler(event: MyEvent):
-            print(f"处理事件: {event.data}")
-
-        bus.subscribe(MyEvent, handler)
-
-        # 发布事件
-        event = MyEvent(data="test")
-        bus.publish(event)
-    """
-    return _event_bus
+async def _publish_event_async(event: Event):
+    """异步发布事件（内部函数）"""
+    event_bus = _event_bus_manager._get_bus()
+    await event_bus._publish_async(event)

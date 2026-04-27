@@ -1,289 +1,245 @@
 """
-装饰器主入口模块 - 提供@Component和@Plugin装饰器
+装饰器工具模块 - 精简版
+提供核心装饰器：拦截器、参数验证、性能监控
 """
 
-from typing import Any, Dict, Type, Optional, Callable, TypeVar, overload
-
-T = TypeVar("T")
-
-
-class ComponentRegistry:
-    """组件注册器 - 用于存储和管理被装饰的组件"""
-
-    _components: Dict[str, Type[Any]] = {}
-    _plugins: Dict[str, Type[Any]] = {}
-
-    @classmethod
-    def register_component(cls, name: str, obj: Any, is_plugin: bool = False):
-        """注册组件"""
-        if is_plugin:
-            cls._plugins[name] = obj
-        else:
-            cls._components[name] = obj
-
-    @classmethod
-    def register_plugin(cls, name: str, obj: Any):
-        """注册插件（便捷方法）"""
-        cls._plugins[name] = obj
-
-    @classmethod
-    def get_component(cls, name: str) -> Optional[Any]:
-        """获取组件"""
-        return cls._components.get(name)
-
-    @classmethod
-    def get_plugin(cls, name: str) -> Optional[Any]:
-        """获取插件"""
-        return cls._plugins.get(name)
-
-    @classmethod
-    def get_components(cls) -> Dict[str, Any]:
-        """获取所有组件（兼容性方法）"""
-        return cls._components.copy()
-
-    @classmethod
-    def get_plugins(cls) -> Dict[str, Any]:
-        """获取所有插件（兼容性方法）"""
-        return cls._plugins.copy()
-
-    @classmethod
-    def clear(cls):
-        """清空注册表（用于测试）"""
-        cls._components.clear()
-        cls._plugins.clear()
+from typing import Callable, Any, Optional, Dict, get_type_hints
+from functools import wraps
+from inspect import signature
+from ._logging import (
+    _log_framework_debug,
+    _log_framework_info,
+    _log_framework_warning,
+    _log_framework_error,
+)
 
 
-def _get_name(obj: Any, provided_name: Optional[str] = None) -> str:
-    """获取组件/插件名称"""
-    if provided_name is not None:
-        return provided_name
-    if hasattr(obj, "__name__"):
-        return str(obj.__name__)
-    return str(obj)
+# ============================================================================
+# 拦截器装饰器
+# ============================================================================
 
 
-def _validate_inheritance(obj: Any, is_plugin: bool = False):
-    """验证继承关系"""
-    if is_plugin:
-        from ._plugin_base import PluginBase
-
-        if not issubclass(obj, PluginBase):
-            raise TypeError(f"Plugin {obj.__name__} 必须继承自 PluginBase")
-    # 组件不需要特定基类
-
-
-@overload
-def Component(name_or_cls: type[T]) -> type[T]: ...
-
-
-@overload
-def Component(
-    name_or_cls: str,
-    *,
-    scope: str = "singleton",
-    singleton: Optional[bool] = None,
-) -> Callable[[type[T]], type[T]]: ...
-
-
-@overload
-def Component(
-    *,
-    scope: str = "singleton",
-    singleton: Optional[bool] = None,
-) -> Callable[[type[T]], type[T]]: ...
-
-
-def Component(
-    name_or_cls=None, *, scope: str = "singleton", singleton: Optional[bool] = None
+def Interceptor(
+    intercept_params: Optional[Callable] = None,
+    intercept_result: Optional[Callable] = None,
+    intercept_exception: Optional[Callable] = None,
+    log_intercept: bool = False,
 ):
     """
-    组件装饰器 - 用于标记一个类为可注入的组件
+    拦截器装饰器 - 通用函数拦截和修改
 
     Args:
-        name_or_cls: 组件名称（字符串）或被装饰的类（当直接使用@Component时）
-        scope: 实例作用域，'singleton'（单例）或 'transient'（瞬态），默认为'singleton'
-        singleton: 已弃用，请使用 scope 参数
+        intercept_params: 拦截参数的回调函数，接收 (args, kwargs)，返回修改后的 (args, kwargs)
+        intercept_result: 拦截结果的回调函数，接收结果，返回修改后的结果
+        intercept_exception: 拦截异常的回调函数，接收异常，返回处理后的异常或新结果
+        log_intercept: 是否记录拦截日志（默认 False）
+
+    Returns:
+        装饰后的函数
 
     Example:
-        @Component("my_service")
-        class MyService:
+        # 结果转换
+        @Interceptor(intercept_result=lambda result: result.upper())
+        def my_function(name: str) -> str:
+            return name
+
+        # 输入清理
+        @Interceptor(intercept_params=lambda args, kwargs: (args, {k: v.strip() if isinstance(v, str) else v for k, v in kwargs.items()}))
+        def my_function(name: str, email: str) -> None:
             pass
 
-        @Component  # 使用类名作为组件名，单例
-        class AnotherService:
-            pass
+        # 异常处理
+        @Interceptor(intercept_exception=lambda e: "默认值")
+        def my_function():
+            raise Exception("错误")
 
-        @Component(scope='transient')  # 瞬态实例
-        class TransientService:
-            pass
-
-        @Component("transient_service", scope='transient')  # 命名瞬态实例
-        class NamedTransientService:
-            pass
+    Note:
+        - 支持同时拦截参数、结果和异常
+        - 拦截器按顺序执行，可以链式调用
+        - 异常拦截器可以返回新结果来替代异常
+        - log_intercept=True 时会记录所有拦截操作
+        - 适用于输入验证、结果转换、异常处理等场景
     """
-    # 处理向后兼容性：如果提供了 singleton 参数且没有提供 scope，则转换为 scope
-    if singleton is not None:
-        # 只有当 scope 为默认值时才使用 singleton 参数
-        # 这样可以确保 scope 参数优先于 singleton 参数
-        if scope == "singleton":
-            scope = "singleton" if singleton else "transient"
 
-    # 验证 scope 参数
-    if scope not in ("singleton", "transient"):
-        raise ValueError(f"scope must be 'singleton' or 'transient', got '{scope}'")
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if intercept_params:
+                try:
+                    intercepted = intercept_params(*args, **kwargs)
 
-    singleton_bool = scope == "singleton"
+                    if isinstance(intercepted, dict):
+                        kwargs.update(intercepted)
+                    elif isinstance(intercepted, tuple) and len(intercepted) == 2:
+                        args, kwargs = intercepted
 
-    if callable(name_or_cls):
-        # @Component 用法 - name_or_cls 是类
-        cls = name_or_cls
-        component_name = cls.__name__
-        _register_component(
-            cls, component_name, is_plugin=False, singleton=singleton_bool
-        )
-        return cls
-    else:
-        # @Component("name") 或 @Component(scope='transient') 用法
-        def decorator(cls):
-            component_name = name_or_cls if name_or_cls is not None else cls.__name__
-            _register_component(
-                cls, component_name, is_plugin=False, singleton=singleton_bool
-            )
-            return cls
+                    if log_intercept:
+                        _log_framework_debug(f"拦截参数: {func.__name__}")
 
-        return decorator
+                except Exception as e:
+                    _log_framework_warning(f"拦截参数失败: {func.__name__}, 错误: {e}")
+
+            try:
+                result = func(*args, **kwargs)
+
+                if intercept_result:
+                    try:
+                        result = intercept_result(result)
+                        if log_intercept:
+                            _log_framework_debug(f"拦截结果: {func.__name__}")
+                    except Exception as e:
+                        _log_framework_warning(
+                            f"拦截结果失败: {func.__name__}, 错误: {e}"
+                        )
+
+                return result
+
+            except Exception as e:
+                if intercept_exception:
+                    try:
+                        handled = intercept_exception(e)
+
+                        if not isinstance(handled, Exception):
+                            if log_intercept:
+                                _log_framework_info(
+                                    f"拦截异常并返回默认值: {func.__name__}"
+                                )
+                            return handled
+
+                        if log_intercept:
+                            _log_framework_debug(f"拦截异常并重新抛出: {func.__name__}")
+                        raise handled
+
+                    except Exception as callback_error:
+                        if log_intercept:
+                            _log_framework_debug(
+                                f"拦截异常回调失败，重新抛出: {func.__name__}"
+                            )
+                        raise callback_error
+
+                raise
+
+        return wrapper
+
+    return decorator
 
 
-@overload
-def Plugin(name_or_cls: type[T]) -> type[T]: ...
+# ============================================================================
+# 参数验证装饰器
+# ============================================================================
 
 
-@overload
-def Plugin(
-    name_or_cls: str,
-    *,
-    scope: str = "singleton",
-    singleton: Optional[bool] = None,
-) -> Callable[[type[T]], type[T]]: ...
-
-
-@overload
-def Plugin(
-    *,
-    scope: str = "singleton",
-    singleton: Optional[bool] = None,
-) -> Callable[[type[T]], type[T]]: ...
-
-
-def Plugin(
-    name_or_cls=None, *, scope: str = "singleton", singleton: Optional[bool] = None
-):
+def ValidateParams():
     """
-    插件装饰器 - 用于标记一个类为插件
+    参数验证装饰器 - 根据类型注解自动验证函数参数
+
+    Returns:
+        装饰后的函数
+
+    Example:
+        @ValidateParams()
+        def my_function(name: str, age: int) -> None:
+            pass
+
+    Note:
+        - 根据类型注解自动验证参数类型
+        - 验证失败时抛出 TypeError 异常
+        - 自动记录验证失败的详细信息
+        - 支持所有标准 Python 类型（int, str, bool, float, list, dict 等）
+        - 适用于需要严格参数类型检查的函数
+    """
+
+    def decorator(func: Callable) -> Callable:
+        type_hints = get_type_hints(func)
+        func_signature = signature(func)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            bound_args = func_signature.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+
+            for param_name, param_value in bound_args.arguments.items():
+                if param_name in type_hints:
+                    expected_type = type_hints[param_name]
+
+                    if not isinstance(param_value, expected_type):
+                        error_msg = (
+                            f"参数类型错误: {func.__name__}.{param_name}, "
+                            f"期望类型: {expected_type.__name__}, "
+                            f"实际类型: {type(param_value).__name__}"
+                        )
+                        _log_framework_error(error_msg)
+                        raise TypeError(error_msg)
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+# ============================================================================
+# 性能监控装饰器
+# ============================================================================
+
+
+def Timing(log_threshold: float = 1.0):
+    """
+    性能监控装饰器 - 自动记录函数执行时间
 
     Args:
-        name_or_cls: 插件名称（字符串）或被装饰的类（当直接使用@Plugin时）
-        scope: 实例作用域，'singleton'（单例）或 'transient'（瞬态），默认为'singleton'
-        singleton: 已弃用，请使用 scope 参数
+        log_threshold: 日志记录阈值（秒），超过此阈值才记录警告（默认 1.0）
+
+    Returns:
+        装饰后的函数
 
     Example:
-        @Plugin("my_plugin")
-        class MyPlugin(PluginBase):
+        @Timing(log_threshold=0.1)
+        def my_function():
             pass
 
-        @Plugin  # 使用类名作为插件名，单例
-        class AnotherPlugin(PluginBase):
+        @Timing(log_threshold=0.5)
+        def slow_function():
             pass
 
-        @Plugin(scope='transient')  # 瞬态插件
-        class TransientPlugin(PluginBase):
-            pass
-
-        @Plugin("transient_plugin", scope='transient')  # 命名瞬态插件
-        class NamedTransientPlugin(PluginBase):
-            pass
+    Note:
+        - 自动记录函数执行时间
+        - 执行时间超过阈值时记录警告日志
+        - 即使未超过阈值，也会记录调试日志
+        - 适用于性能分析和优化
+        - 不影响函数的正常执行和返回值
     """
-    # 处理向后兼容性：如果提供了 singleton 参数且没有提供 scope，则转换为 scope
-    if singleton is not None:
-        # 只有当 scope 为默认值时才使用 singleton 参数
-        # 这样可以确保 scope 参数优先于 singleton 参数
-        if scope == "singleton":
-            scope = "singleton" if singleton else "transient"
 
-    # 验证 scope 参数
-    if scope not in ("singleton", "transient"):
-        raise ValueError(f"scope must be 'singleton' or 'transient', got '{scope}'")
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import time
 
-    singleton_bool = scope == "singleton"
+            start_time = time.time()
 
-    if callable(name_or_cls):
-        # @Plugin 用法 - name_or_cls 是类
-        cls = name_or_cls
-        # 验证继承关系
-        _validate_inheritance(cls, is_plugin=True)
-        plugin_name = cls.__name__
-        _register_component(cls, plugin_name, is_plugin=True, singleton=singleton_bool)
-        return cls
-    else:
-        # @Plugin("name") 或 @Plugin(scope='transient') 用法
-        def decorator(cls):
-            # 验证继承关系
-            _validate_inheritance(cls, is_plugin=True)
-            plugin_name = name_or_cls if name_or_cls is not None else cls.__name__
-            _register_component(
-                cls, plugin_name, is_plugin=True, singleton=singleton_bool
-            )
-            return cls
+            try:
+                result = func(*args, **kwargs)
 
-        return decorator
+                execution_time = time.time() - start_time
 
+                if execution_time > log_threshold:
+                    _log_framework_warning(
+                        f"函数执行时间: {func.__name__}, 耗时: {execution_time:.3f}秒"
+                    )
+                else:
+                    _log_framework_debug(
+                        f"函数执行时间: {func.__name__}, 耗时: {execution_time:.3f}秒"
+                    )
 
-def _register_component(
-    cls: Any, name: str, is_plugin: bool = False, singleton: bool = True
-):
-    """注册组件或插件的内部函数"""
-    # 注册到组件注册器
-    if is_plugin:
-        ComponentRegistry.register_plugin(name, cls)
-    else:
-        ComponentRegistry.register_component(name, cls)
+                return result
 
-    # 延迟导入DI容器以避免循环依赖
-    from ._di_decorator import get_di_container
+            except Exception as e:
+                execution_time = time.time() - start_time
+                _log_framework_error(
+                    f"函数执行失败: {func.__name__}, 耗时: {execution_time:.3f}秒, 错误: {e}"
+                )
+                raise
 
-    di_container = get_di_container()
-    if is_plugin:
-        di_container.register_plugin(name, cls, singleton=singleton)
-    else:
-        di_container.register_component(name, cls, singleton=singleton)
+        return wrapper
 
-    # 添加统一的元数据到类（使用列表格式与其他装饰器保持一致）
-    if not hasattr(cls, "_decorator_metadata"):
-        setattr(cls, "_decorator_metadata", [])
-
-    scope = "singleton" if singleton else "transient"
-    decorator_metadata = {
-        "type": "plugin" if is_plugin else "component",
-        "name": name,
-        "scope": scope,
-        "singleton": singleton,  # 保持向后兼容性
-    }
-    getattr(cls, "_decorator_metadata").append(decorator_metadata)
-
-    # 保持向后兼容性：同时设置旧的 _component_metadata 属性
-    cls._component_metadata = {
-        "name": name,
-        "type": "plugin" if is_plugin else "component",
-        "is_plugin": is_plugin,
-        "singleton": singleton,
-        "scope": scope,  # 新增 scope 字段
-    }
-
-    # 注册生命周期方法
-    try:
-        from ._lifecycle_decorator import register_lifecycle_methods_for_class
-
-        register_lifecycle_methods_for_class(cls)
-    except ImportError:
-        # 如果生命周期模块未导入，跳过处理
-        pass
+    return decorator
