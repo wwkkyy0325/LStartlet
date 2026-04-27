@@ -34,9 +34,11 @@ jobs:
         pip install tox
     
     - name: Run tests with tox
+      shell: bash
       run: |
         # Remove dots from python version to match tox env names (e.g., 3.10 -> 310)
-        $PYTHON_VERSION_NO_DOTS = "${{ matrix.python-version }}".Replace(".", "")
+        PYTHON_VERSION_NO_DOTS=${{ matrix.python-version }}  
+        PYTHON_VERSION_NO_DOTS=${PYTHON_VERSION_NO_DOTS//./}
         tox -e py$PYTHON_VERSION_NO_DOTS
 
   code-quality:

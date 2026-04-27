@@ -593,25 +593,6 @@ LStartlet 提供23个核心API，大幅降低学习成本和使用复杂度：
 - **自动日志配置**：自动配置日志输出和文件轮转
 - **自动健康检查**：自动检查应用健康状态和依赖关系
 
-## 目录结构
-
-```
-~/.lstartlet/
-├── MyApp/
-│   ├── config/              # 配置目录
-│   │   └── app_config.yaml  # 应用配置文件
-│   ├── logs/                # 日志目录
-│   │   └── myapp.log        # 应用日志
-│   ├── cache/               # 缓存目录
-│   ├── data/                # 数据目录
-│   ├── plugins/             # 插件目录
-│   └── ui/                  # UI 配置目录
-│       └── ui_config.yaml   # UI 配置文件
-├── logs/
-│   └── lstartlet.log        # 框架日志
-└── config.yaml              # 框架配置
-```
-
 ## 开发指南
 
 详细的开发指南请参考 [DEVELOPMENT.md](DEVELOPMENT.md)

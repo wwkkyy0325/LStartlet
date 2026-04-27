@@ -10,7 +10,6 @@ from ._di_decorator import _start_framework, _stop_framework, _activate_framewor
 from ._plugin_manager import _get_plugin_manager, _PluginManager
 from ._logging import _log_framework_info, _log_framework_error, _log_framework_warning
 
-
 # ============================================================================
 # 主框架类 - 内部实现
 # ============================================================================
