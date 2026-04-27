@@ -93,3 +93,23 @@ __all__ = [
     "ValidateParams",
     "Timing",
 ]
+
+# 创建小写别名，方便导入
+import sys
+import types
+
+# 创建 lstartlet 模块别名
+_lstartlet_module = types.ModuleType("lstartlet")
+_lstartlet_module.__name__ = "lstartlet"
+_lstartlet_module.__package__ = "LStartlet"
+_lstartlet_module.__file__ = __file__
+
+# 导出所有公共API到别名模块
+for name in __all__:
+    setattr(_lstartlet_module, name, globals()[name])
+
+# 将别名添加到当前模块的命名空间
+lstartlet = _lstartlet_module
+
+# 将别名添加到 sys.modules 中，使得 import lstartlet 可以工作
+sys.modules["lstartlet"] = _lstartlet_module
