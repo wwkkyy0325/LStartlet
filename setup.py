@@ -16,20 +16,14 @@ setup(
     author="wwkkyy0325",
     author_email="1074446976@qq.com",
     description=(
-        "A modular, high-cohesion, low-coupling infrastructure framework "
-        "for Python applications"
+        "A lightweight Python framework with dependency injection, "
+        "event system, lifecycle management, and configuration management"
     ),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/wwkkyy0325/LStartlet",
     package_dir={"": "src"},
-    packages=find_packages(
-        where="src",
-        exclude=[
-            "LStartlet.plugin.example_ocr_plugin",
-            "LStartlet.plugin.example_ocr_plugin.*",
-        ],
-    ),
+    packages=find_packages(where="src"),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -37,6 +31,8 @@ setup(
         "Operating System :: Microsoft :: Windows",
         "Operating System :: Microsoft :: Windows :: Windows 10",
         "Operating System :: Microsoft :: Windows :: Windows 11",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -44,9 +40,17 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Topic :: Software Development :: Libraries :: Application Frameworks",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Framework :: Pytest",
     ],
     python_requires=">=3.9, <3.14",
     install_requires=requirements,
     zip_safe=False,
     include_package_data=True,
+    keywords="framework dependency-injection event-system lifecycle management configuration",
+    project_urls={
+        "Bug Reports": "https://github.com/wwkkyy0325/LStartlet/issues",
+        "Source": "https://github.com/wwkkyy0325/LStartlet",
+        "Documentation": "https://github.com/wwkkyy0325/LStartlet#readme",
+    },
 )
